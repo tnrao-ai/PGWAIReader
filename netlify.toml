@@ -1,0 +1,17 @@
+# This section tells Netlify how to build the site.
+# It confirms the command to run and the folder to publish.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# THIS IS THE CRUCIAL FIX for the live application.
+# This section tells the live Netlify server how to handle requests.
+# It is a "catch-all" rule that says: "If you get a request for a path
+# you don't recognize (like /content/my-man-jeeves.json), don't return a 404 error.
+# Instead, serve the main index.html file and let the React app
+# handle the request internally." This is the standard for SPAs.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
