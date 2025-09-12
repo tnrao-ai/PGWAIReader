@@ -46,29 +46,39 @@ const LibraryView = ({ library, onSelectBook }) => (
    ---------------------- */
 const DictionaryModal = ({ word, loading, error, entries, onClose }) => {
   if (!word) return null;
+
+  const hasEntries = Array.isArray(entries) && entries.length > 0;
+
   return (
-    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xl font-semibold">Definition: <span className="italic">{word}</span></h3>
           <button onClick={onClose} className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">Close</button>
         </div>
+
         {loading && (
           <div className="flex items-center justify-center h-24">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         )}
+
         {!loading && error && (
           <p className="text-red-600">{error}</p>
         )}
-        {!loading && !error && entries && entries.length > 0 && (
+
+        {!loading && !error && !hasEntries && (
+          <p className="text-gray-700 dark:text-gray-300">No definition found.</p>
+        )}
+
+        {!loading && !error && hasEntries && (
           <div className="prose prose-sm dark:prose-invert max-w-none">
             {entries.map((entry, idx) => (
               <div key={idx} className="mb-4">
-                {entry.phonetic && <div className="text-gray-600">{entry.phonetic}</div>}
+                {entry.word && <div className="text-gray-700 dark:text-gray-300 font-semibold">{entry.word}{entry.phonetic ? ` · ${entry.phonetic}` : ''}</div>}
                 {entry.meanings?.map((m, i) => (
                   <div key={i} className="mt-2">
-                    <div className="font-semibold">{m.partOfSpeech}</div>
+                    <div className="font-semibold">{m.partOfSpeech || 'definition'}</div>
                     <ol className="list-decimal pl-5">
                       {m.definitions?.slice(0, 3).map((d, j) => (
                         <li key={j} className="mt-1">
@@ -263,6 +273,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
 
   // Helpers to detect word at a point (for long-press)
   const getWordFromPoint = (clientX, clientY) => {
+    // Safari supports caretRangeFromPoint; Firefox newer API differs
     const range = document.caretRangeFromPoint
       ? document.caretRangeFromPoint(clientX, clientY)
       : null;
@@ -288,6 +299,10 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   };
 
   // Mobile long-press handlers
+  const longPressTimer = useRef(null);
+  const longPressActive = useRef(false);
+  const lastTouchPoint = useRef({ x: 0, y: 0 });
+
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return;
     const { clientX, clientY } = e.touches[0];
@@ -296,7 +311,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
 
     longPressTimer.current = window.setTimeout(() => {
       if (!longPressActive.current) return;
-      // Try using existing selection first (iOS may already select)
       const sel = window.getSelection();
       let word = '';
       if (sel && sel.toString().trim()) {
@@ -311,11 +325,10 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         setDefineBtnPos({ x: clientX, y: window.scrollY + clientY - 8 });
         setShowDefineButton(true);
       }
-    }, 550); // 550ms long-press
+    }, 550);
   };
 
   const handleTouchMove = (e) => {
-    // Cancel long-press if user moves finger significantly
     if (!e.touches || e.touches.length === 0) return;
     const { clientX, clientY } = e.touches[0];
     const dx = clientX - lastTouchPoint.current.x;
@@ -331,7 +344,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
   };
 
-  // Dictionary lookup
+  // Dictionary lookup (hardened)
   const fetchDefinition = async (word) => {
     if (!word) return;
     setDictLoading(true);
@@ -339,12 +352,31 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     setDictEntries(null);
     try {
       const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
-      const resp = await fetch(url, { cache: 'no-cache' });
-      if (!resp.ok) throw new Error(`Dictionary lookup failed (${resp.status})`);
-      const data = await resp.json();
+      const resp = await fetch(url, {
+        cache: 'no-cache',
+        headers: { 'Accept': 'application/json' },
+        mode: 'cors',
+      });
+
+      const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+      const isJSON = contentType.includes('application/json');
+
+      if (resp.status === 404) {
+        // Known “No Definitions Found” case from this API
+        setDictEntries([]);
+        setDictError('');
+        return;
+      }
+      if (!resp.ok) {
+        const message = isJSON ? JSON.stringify(await resp.json()) : (await resp.text());
+        throw new Error(`Dictionary lookup failed (${resp.status}): ${message.slice(0, 300)}`);
+      }
+
+      const data = isJSON ? await resp.json() : [];
       setDictEntries(Array.isArray(data) ? data : []);
     } catch (err) {
       setDictError(err?.message || 'Failed to fetch definition.');
+      setDictEntries([]);
     } finally {
       setDictLoading(false);
     }
@@ -419,7 +451,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       {showDefineButton && selectedWord && (
         <button
           onClick={openDefinition}
-          className="fixed z-30 px-3 py-1 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700"
+          className="fixed z-40 px-3 py-1 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700"
           style={{ left: defineBtnPos.x, top: defineBtnPos.y, transform: 'translate(-50%, -100%)' }}
         >
           Define
@@ -588,7 +620,7 @@ export default function App() {
     if (selectedBook) handleSelectBook(selectedBook);
   };
 
-  // *** ChatGPT summary via Netlify Function ***
+  // ChatGPT summary via Netlify Function
   const handleAiSummary = async () => {
     if (!bookContent || !Array.isArray(bookContent.chapters)) return;
     setIsAiPanelOpen(true);
@@ -612,11 +644,14 @@ export default function App() {
           prompt: `Provide a concise, one-paragraph summary (4–6 sentences, neutral tone) of the following chapter:\n\n${chapterText}`
         })
       });
+      const text = await resp.text();
       if (!resp.ok) {
-        const t = await resp.text();
-        throw new Error(`Summarize failed: ${resp.status} ${t}`);
+        // Show the server error to the user for easier debugging
+        setAiResponse(`Summary failed: ${resp.status} ${text.slice(0, 400)}`);
+        setIsAiLoading(false);
+        return;
       }
-      const data = await resp.json();
+      const data = JSON.parse(text);
       setAiResponse(data.summary || 'No summary available.');
     } catch (error) {
       setAiResponse('Sorry, I was unable to generate a summary at this time.');

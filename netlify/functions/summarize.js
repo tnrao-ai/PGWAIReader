@@ -1,72 +1,101 @@
 // netlify/functions/summarize.js
-// Node-style Netlify Function (runs on AWS Lambda under the hood)
+// Node/Netlify Function (CommonJS) — no extra deps required
 
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {
-      return { statusCode: 405, body: 'Method Not Allowed' };
+      return {
+        statusCode: 405,
+        headers: corsHeaders(),
+        body: 'Method Not Allowed'
+      };
     }
 
-    const { prompt } = JSON.parse(event.body || '{}');
-    if (!prompt || typeof prompt !== 'string') {
-      return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing prompt' })
-      };
+    let json;
+    try {
+      json = JSON.parse(event.body || '{}');
+    } catch {
+      return jsonError(400, 'Invalid JSON in request body');
+    }
+
+    const rawPrompt = (json.prompt || '').toString();
+    if (!rawPrompt.trim()) {
+      return jsonError(400, 'Missing prompt');
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return {
-        statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Server missing OPENAI_API_KEY' })
-      };
+      return jsonError(500, 'Server missing OPENAI_API_KEY');
     }
 
-    const resp = await fetch('https://api.openai.com/v1/responses', {
+    // Clip very large inputs to keep request sizes safe and latency low
+    const CHAR_LIMIT = 24000; // ~6k tokens rough estimate
+    const prompt = rawPrompt.length > CHAR_LIMIT ? rawPrompt.slice(0, CHAR_LIMIT) : rawPrompt;
+
+    // Use Chat Completions (stable)
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // upgrade to 'gpt-4o'/'gpt-4.1' if you want
-        input: [
-          "Summarize the following chapter in 4–6 sentences, neutral tone, no spoilers beyond the chapter:",
-          prompt
-        ],
+        model: 'gpt-4o-mini',           // upgrade to 'gpt-4o' / 'gpt-4.1' for higher quality
         temperature: 0.4,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a concise literary summarizer. Provide a neutral 4–6 sentence summary of the given chapter. Avoid spoilers beyond the provided text.'
+          },
+          { role: 'user', content: prompt }
+        ]
       }),
     });
 
+    const text = await resp.text();
     if (!resp.ok) {
-      const text = await resp.text();
-      return {
-        statusCode: 502,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: `OpenAI error ${resp.status}: ${text}` }),
-      };
+      // Bubble up OpenAI error text
+      return jsonError(502, `OpenAI error ${resp.status}: ${truncate(text, 600)}`);
     }
 
-    const data = await resp.json();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return jsonError(502, `OpenAI returned non-JSON response: ${truncate(text, 600)}`);
+    }
+
     const summary =
-      data?.output_text ||
-      data?.choices?.[0]?.message?.content ||
-      data?.choices?.[0]?.text ||
+      data?.choices?.[0]?.message?.content?.trim() ||
       'No summary available.';
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary }),
+      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary })
     };
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: err?.message || 'Unknown error' }),
-    };
+    return jsonError(500, err?.message || 'Unknown error');
   }
 };
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+}
+
+function jsonError(statusCode, message) {
+  return {
+    statusCode,
+    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ error: message })
+  };
+}
+
+function truncate(s, n) {
+  return (s || '').length > n ? s.slice(0, n) + '…' : s;
+}
