@@ -130,7 +130,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   const [dictError, setDictError] = useState('');
   const [dictEntries, setDictEntries] = useState(null);
 
-  // Mobile long-press state
+  // Mobile long-press state (declare ONCE)
   const longPressTimer = useRef(null);
   const longPressActive = useRef(false);
   const lastTouchPoint = useRef({ x: 0, y: 0 });
@@ -273,7 +273,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
 
   // Helpers to detect word at a point (for long-press)
   const getWordFromPoint = (clientX, clientY) => {
-    // Safari supports caretRangeFromPoint; Firefox newer API differs
     const range = document.caretRangeFromPoint
       ? document.caretRangeFromPoint(clientX, clientY)
       : null;
@@ -298,11 +297,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     return normalizeWord(word);
   };
 
-  // Mobile long-press handlers
-  const longPressTimer = useRef(null);
-  const longPressActive = useRef(false);
-  const lastTouchPoint = useRef({ x: 0, y: 0 });
-
+  // Mobile long-press handlers (use the ONE set of refs declared above)
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return;
     const { clientX, clientY } = e.touches[0];
@@ -362,7 +357,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       const isJSON = contentType.includes('application/json');
 
       if (resp.status === 404) {
-        // Known “No Definitions Found” case from this API
         setDictEntries([]);
         setDictError('');
         return;
@@ -646,7 +640,6 @@ export default function App() {
       });
       const text = await resp.text();
       if (!resp.ok) {
-        // Show the server error to the user for easier debugging
         setAiResponse(`Summary failed: ${resp.status} ${text.slice(0, 400)}`);
         setIsAiLoading(false);
         return;
