@@ -1,0 +1,24 @@
+[
+  {
+    "id": "my-man-jeeves",
+    "title": "My Man Jeeves",
+    "author": "P. G. Wodehouse",
+    "coverImage": "https://www.gutenberg.org/cache/epub/8164/pg8164.cover.medium.jpg",
+    "contentFile": "my-man-jeeves.json"
+  },
+  {
+    "id": "a-damsel-in-distress",
+    "title": "A Damsel in Distress",
+    "author": "P. G. Wodehouse",
+    "coverImage": "https://www.gutenberg.org/cache/epub/1154/pg1154.cover.medium.jpg",
+    "contentFile": "a-damsel-in-distress.json"
+  },
+  {
+    "id": "something-new",
+    "title": "Something New",
+    "author": "P. G. Wodehouse",
+    "coverImage": "https://www.gutenberg.org/cache/epub/7423/pg7423.cover.medium.jpg",
+    "contentFile": "something-new.json"
+  }
+]
+
