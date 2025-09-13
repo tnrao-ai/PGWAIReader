@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Games from "./views/Games.jsx";
 
 /* =========================
    Phase 1 Utilities (cache, metrics, backoff)
@@ -69,7 +70,7 @@ const Header = ({ onSettingsClick }) => (
   <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-10">
     <div className="container mx-auto p-4 flex justify-between items-center">
       <h1 className="text-2xl md:text-3xl font-serif font-bold text-gray-900 dark:text-white">Wodehouse AI Reader</h1>
-      <button onClick={onSettingsClick} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+      <button onClick={onSettingsClick} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" aria-label="Settings">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.438.995s.145.755.438.995l1.003.827c.481.398.635 1.08.26 1.431l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.217-.456c-.355-.133-.75-.072-1.075.124a6.57 6.57 0 01-.22.127c-.331.183-.581.495-.645.87l-.213 1.281c-.09.543-.56.94-1.11.94h-2.593c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.075-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.437-.995s-.145-.755-.437-.995l-1.004-.827a1.125 1.125 0 01-.26-1.431l1.296-2.247a1.125 1.125 0 011.37-.49l1.217.456c.355.133.75.072 1.075-.124.072-.044.146-.087.22-.127.332-.183.582-.495.645-.87l.213-1.281z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
       </button>
     </div>
@@ -83,7 +84,6 @@ const LegalDisclaimer = ({ open, onToggle }) => {
   return (
     <section className="mb-6 md:mb-8">
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-        {/* Header row with toggle */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-200 dark:border-gray-700">
           <h2 className="m-0 text-base md:text-lg font-bold">
             Legal Disclaimer for Wodehouse AI Reader – P.G. Wodehouse Collection
@@ -98,7 +98,6 @@ const LegalDisclaimer = ({ open, onToggle }) => {
           </button>
         </div>
 
-        {/* Body (collapsible) */}
         {open && (
           <div id="disclaimer-body" className="p-5 sm:p-6">
             <div className="prose dark:prose-invert max-w-none">
@@ -142,7 +141,7 @@ const LibraryView = ({ library, onSelectBook, disclaimerOpen, onToggleDisclaimer
         <div
           key={book.id}
           onClick={() => onSelectBook(book)}
-          className="cursor-pointer group bg-white rounded-lg shadow hover:shadow-lg overflow-hidden"
+          className="cursor-pointer group bg-white rounded-lg shadow hover:shadow-lg overflow-hidden transition-transform duration-150 hover:scale-[1.01]"
         >
           <img src={book.coverImage} alt={`Cover of ${book.title}`} className="w-full h-48 object-cover" />
           <div className="p-3">
@@ -464,7 +463,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
   };
 
-  /** Normalize DictionaryAPI.dev response to our UI shape (client fallback) */
+  /** Normalize DictionaryAPI.dev response (client fallback) */
   const normalizeDictionaryApiClient = (arr) => {
     if (!Array.isArray(arr)) return [];
     return arr.map(entry => ({
@@ -516,7 +515,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       setDictLoading(false);
       logMetric('cache');
       logMetric('ok', Math.max(1, Math.round(performance.now() - startMs)));
-      // Optional SWR: continue in background (not necessary now)
       return;
     }
 
@@ -552,7 +550,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         return;
       }
 
-      // If function gave explicit error but no entries, surface it and continue to fallback
       const serverError = data.error ? ` Server: ${data.error}` : '';
 
       // Fallback: direct to DictionaryAPI.dev (CORS OK)
@@ -572,7 +569,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
           return;
         }
       } catch {
-        // ignore; we'll fall through to error below
+        // ignore; we’ll fall through to error below
       }
 
       setDictError(serverError || 'No results from providers.');
@@ -649,7 +646,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
 
       {/* Bottom controls */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 bg-white flex justify-between items-center">
-        <button onClick={onAiSummary} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <button onClick={onAiSummary} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
           Chapter Summary
         </button>
         <div className="flex items-center gap-4">
@@ -663,7 +660,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       {showDefineButton && selectedWord && (
         <button
           onClick={openDefinition}
-          className="fixed z-40 px-3 py-1 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700"
+          className="fixed z-40 px-3 py-1 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700 transition"
           style={{ left: defineBtnPos.x, top: defineBtnPos.y, transform: 'translate(-50%, -100%)' }}
         >
           Define
@@ -758,6 +755,9 @@ export default function App() {
   const [aiResponse, setAiResponse] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // NEW: App-level view switch
+  const [activeView, setActiveView] = useState("library"); // "library" | "games"
 
   // Disclaimer: show-once behavior
   const [disclaimerOpen, setDisclaimerOpen] = useState(true);
@@ -868,7 +868,7 @@ export default function App() {
     );
   };
 
-  // Main render
+  // Main render (Library/Reader)
   const renderContent = () => {
     if (isLoading) return <LoadingScreen message="Loading Library..." />;
 
@@ -931,8 +931,33 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col text-gray-800 dark:text-gray-200 transition-colors duration-300 bg-gray-50">
       <Header onSettingsClick={() => setIsSettingsOpen(true)} />
+
+      {/* NEW: Top nav to switch views */}
+      <div className="container mx-auto px-4 mt-3">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveView("library")}
+            className={`px-3 py-2 rounded-lg border transition ${activeView==="library" ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+            aria-pressed={activeView==="library"}
+          >
+            📚 Library
+          </button>
+          <button
+            onClick={() => setActiveView("games")}
+            className={`px-3 py-2 rounded-lg border transition ${activeView==="games" ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+            aria-pressed={activeView==="games"}
+          >
+            🎮 Games &amp; Stats
+          </button>
+        </div>
+      </div>
+
       <main className="flex-1 container mx-auto p-4 md:p-8">
-        {renderContent()}
+        {activeView === "games" ? (
+          <Games />
+        ) : (
+          renderContent()
+        )}
       </main>
 
       {/* Footer appears on every page */}

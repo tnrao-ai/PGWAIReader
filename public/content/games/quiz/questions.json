@@ -1,0 +1,72 @@
+[
+  {
+    "id": "q001",
+    "question": "Who is the valet to Bertie Wooster?",
+    "answer": ["jeeves"],
+    "tags": ["jeeves","wooster"],
+    "difficulty": 1
+  },
+  {
+    "id": "q002",
+    "question": "What is the name of the castle central to the Blandings stories?",
+    "answer": ["blandings castle","blandings"],
+    "tags": ["blandings"],
+    "difficulty": 1
+  },
+  {
+    "id": "q003",
+    "question": "Name the mischievous pig often featured at Blandings.",
+    "answer": ["the empress of blandings", "empress of blandings", "the empress"],
+    "tags": ["blandings","pig"],
+    "difficulty": 2
+  },
+  {
+    "id": "q004",
+    "question": "Aunt ____ often sends Bertie on errands.",
+    "answer": ["dahlia"],
+    "tags": ["aunts"],
+    "difficulty": 1
+  },
+  {
+    "id": "q005",
+    "question": "Bertie belongs to which club famous for high jinks?",
+    "answer": ["the drones club","drones club","drones"],
+    "tags": ["wooster","club"],
+    "difficulty": 1
+  },
+  {
+    "id": "q006",
+    "question": "Lord ____ presides over Blandings Castle.",
+    "answer": ["emsworth"],
+    "tags": ["blandings"],
+    "difficulty": 1
+  },
+  {
+    "id": "q007",
+    "question": "What’s Jeeves’s profession?",
+    "answer": ["valet","gentleman's personal gentleman"],
+    "tags": ["jeeves"],
+    "difficulty": 1
+  },
+  {
+    "id": "q008",
+    "question": "Name Bertie Wooster’s last name.",
+    "answer": ["wooster"],
+    "tags": ["wooster"],
+    "difficulty": 1
+  },
+  {
+    "id": "q009",
+    "question": "Finish the title: 'Right ____ Jeeves'.",
+    "answer": ["ho"],
+    "tags": ["titles"],
+    "difficulty": 1
+  },
+  {
+    "id": "q010",
+    "question": "Wodehouse’s first name is Pelham. What is his middle name’s initial?",
+    "answer": ["g"],
+    "tags": ["author"],
+    "difficulty": 2
+  }
+]

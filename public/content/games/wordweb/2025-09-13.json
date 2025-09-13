@@ -1,0 +1,104 @@
+{
+  "date": "2025-09-13",
+  "theme": "Sample Theme",
+  "grid": [
+    "B G V I C U F X X U",
+    "I Z O C I Z Y D B D",
+    "D O X H I K J L Q M",
+    "B P P S A G A F T Y",
+    "D J V N M N D Q I O",
+    "C U D I D Z D T S O",
+    "P Z X I Y W B A H W",
+    "A U N T D A H L I A",
+    "E G A S A C W P P D",
+    "S F H Z D V N R V V"
+  ],
+  "answers": [
+    {
+      "text": "AUNT DAHLIA",
+      "path": [
+        [
+          7,
+          0
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          9
+        ]
+      ]
+    },
+    {
+      "text": "BLANDINGS",
+      "path": [
+        [
+          1,
+          8
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          0
+        ]
+      ]
+    }
+  ]
+}
