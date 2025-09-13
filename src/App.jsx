@@ -16,7 +16,7 @@ const Header = ({ onSettingsClick }) => (
     <div className="container mx-auto p-4 flex justify-between items-center">
       <h1 className="text-2xl md:text-3xl font-serif font-bold text-gray-900 dark:text-white">Wodehouse AI Reader</h1>
       <button onClick={onSettingsClick} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.438.995s.145.755.438.995l1.003.827c.481.398.635 1.08.26 1.431l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.217-.456c-.355-.133-.75-.072-1.075.124a6.57 6.57 0 01-.22.127c-.331.183-.581.495-.645.87l-.213 1.281c-.09.543-.56.94-1.11.94h-2.593c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.075-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.437-.995s-.145-.755-.437-.995l-1.004-.827a1.125 1.125 0 01-.26-1.431l1.296-2.247a1.125 1.125 0 011.37-.49l1.217.456c.355.133.75.072 1.075-.124.072-.044.146-.087.22-.127.332-.183.582-.495.645-.87l.213-1.281z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.438.995s.145.755.438.995l1.003.827c.481.398.635 1.08.26 1.431l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.217-.456c-.355-.133-.75-.072-1.075.124a6.57 6.57 0 01-.22.127c-.331.183-.581.495-.645.87l-.213 1.281c-.09.543-.56.94-1.11.94h-2.593c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.075-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l-1.003-.827c.292-.24.437-.613.437-.995s-.145-.755-.437-.995l-1.004-.827a1.125 1.125 0 01-.26-1.431l1.296-2.247a1.125 1.125 0 011.37-.49l1.217.456c.355.133.75.072 1.075-.124.072-.044.146-.087.22-.127.332-.183.582-.495.645-.87l.213-1.281z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
       </button>
     </div>
   </header>
@@ -29,7 +29,6 @@ const LegalDisclaimer = ({ open, onToggle }) => {
   return (
     <section className="mb-6 md:mb-8">
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-        {/* Header row with toggle */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-200 dark:border-gray-700">
           <h2 className="m-0 text-base md:text-lg font-bold">
             Legal Disclaimer for Wodehouse AI Reader – P.G. Wodehouse Collection
@@ -44,7 +43,6 @@ const LegalDisclaimer = ({ open, onToggle }) => {
           </button>
         </div>
 
-        {/* Body (collapsible) */}
         {open && (
           <div id="disclaimer-body" className="p-5 sm:p-6">
             <div className="prose dark:prose-invert max-w-none">
@@ -77,12 +75,11 @@ const LegalDisclaimer = ({ open, onToggle }) => {
 };
 
 /* ----------------------
-   Library View (includes Legal Disclaimer + toggle)
+   Library View
    ---------------------- */
 const LibraryView = ({ library, onSelectBook, disclaimerOpen, onToggleDisclaimer }) => (
   <div className="container mx-auto p-4">
     <LegalDisclaimer open={disclaimerOpen} onToggle={onToggleDisclaimer} />
-
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
       {library.map(book => (
         <div
@@ -104,8 +101,8 @@ const LibraryView = ({ library, onSelectBook, disclaimerOpen, onToggleDisclaimer
 /* ----------------------
    Dictionary Modal
    ---------------------- */
-const DictionaryModal = ({ word, loading, error, entries, onClose }) => {
-  if (!word) return null;
+const DictionaryModal = ({ isOpen, word, loading, error, entries, onClose }) => {
+  if (!isOpen) return null;
 
   const hasEntries = Array.isArray(entries) && entries.length > 0;
 
@@ -157,7 +154,7 @@ const DictionaryModal = ({ word, loading, error, entries, onClose }) => {
 };
 
 /* ----------------------
-   Reading View (sentence-aware pagination + dictionary + mobile long-press)
+   Reading View (dictionary + mobile long-press)
    ---------------------- */
 const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack, onAiSummary }) => {
   if (!book || !Array.isArray(book.chapters) || book.chapters.length === 0) {
@@ -174,10 +171,9 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     ? chapter.content
     : (typeof chapter?.content === 'string' ? chapter.content.split('\n\n') : []);
 
-  // Layout & pagination refs/state
-  const viewportRef = useRef(null);   // visible page box
-  const measurerRef = useRef(null);   // offscreen measurer
-  const [pages, setPages] = useState([]);       // page = array of paragraph strings
+  const viewportRef = useRef(null);
+  const measurerRef = useRef(null);
+  const [pages, setPages] = useState([]);
   const [pageIndex, setPageIndex] = useState(0);
 
   // Dictionary states
@@ -187,19 +183,18 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   const [dictLoading, setDictLoading] = useState(false);
   const [dictError, setDictError] = useState('');
   const [dictEntries, setDictEntries] = useState(null);
+  const [isDictOpen, setIsDictOpen] = useState(false); // NEW: open modal only after Define
 
   // Mobile long-press state
   const longPressTimer = useRef(null);
   const longPressActive = useRef(false);
   const lastTouchPoint = useRef({ x: 0, y: 0 });
 
-  // Sentence splitting
   const splitIntoSentences = (text) => {
     const matches = text.match(/[^.!?…]+[.!?…]"?'?\)?\s*/g);
     return matches || [text];
   };
 
-  // Pagination core (measure sentences, end pages at boundaries)
   const paginate = () => {
     const viewport = viewportRef.current;
     const measurer = measurerRef.current;
@@ -237,7 +232,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         return;
       }
 
-      // fallback: build paragraph by sentences
       p.remove();
       const sentences = splitIntoSentences(text);
       let paraBuffer = '';
@@ -253,17 +247,13 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         if (measurer.scrollHeight <= maxHeight) {
           paraBuffer = candidate;
         } else {
-          // close current page
           if (currentPage.length || paraBuffer.trim()) {
             flushParaBufferInto(currentPage);
             resultPages.push(currentPage);
           }
-          // start new page with this sentence
           currentPage = [];
           paraBuffer = s;
           resetMeasurerWith([paraBuffer]);
-
-          // If single sentence is taller than a page (edge case)
           if (measurer.scrollHeight > maxHeight) {
             resultPages.push([paraBuffer]);
             paraBuffer = '';
@@ -281,7 +271,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     setPageIndex(0);
   };
 
-  // Re-paginate on chapter change or resize
   useEffect(() => {
     paginate();
     const ro = new ResizeObserver(() => paginate());
@@ -290,11 +279,10 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChapterIndex, chapter]);
 
-  // Navigation
   const goToNextChapter = () =>
     setCurrentChapterIndex(Math.min(book.chapters.length - 1, currentChapterIndex + 1));
   const goToPreviousChapter = () =>
-    setCurrentChapterIndex(Math.max(0, currentChapterIndex - 1));
+    setCurrentChapterIndex(Math.max(0, 0, currentChapterIndex - 1));
   const goToNextPage = () =>
     setPageIndex(i => Math.min((pages.length || 1) - 1, i + 1));
   const goToPreviousPage = () =>
@@ -313,20 +301,20 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       setSelectedWord(normalized);
       setDefineBtnPos({ x: rect.left + rect.width / 2, y: rect.top + window.scrollY - offsetY });
       setShowDefineButton(true);
+      setIsDictOpen(false); // keep modal closed until Define is pressed
     } else {
       setShowDefineButton(false);
       setSelectedWord('');
     }
   };
 
-  // Helpers
   const normalizeWord = (str) => {
     if (!str) return '';
     let w = str.trim();
     w = w.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[—–]/g, '-');
-    w = w.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, ''); // edge punctuation
-    w = w.replace(/('s|’s)$/i, '');                // possessives
-    if (w.includes("'")) w = w.split("'")[0];      // contractions → left part
+    w = w.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '');
+    w = w.replace(/('s|’s)$/i, '');
+    if (w.includes("'")) w = w.split("'")[0];
     if (w.includes("’")) w = w.split("’")[0];
     w = w.toLowerCase();
     const m = w.match(/^[a-z][a-z\-]*$/i);
@@ -370,6 +358,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         setSelectedWord(word);
         setDefineBtnPos({ x: clientX, y: window.scrollY + clientY - 8 });
         setShowDefineButton(true);
+        setIsDictOpen(false);
       }
     }, 550);
   };
@@ -388,53 +377,84 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
   };
 
+  /** Normalize DictionaryAPI.dev response to our UI shape */
+  const normalizeDictionaryApiClient = (arr) => {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(entry => ({
+      word: entry.word,
+      phonetic: entry.phonetic || (Array.isArray(entry.phonetics) && entry.phonetics[0]?.text) || '',
+      meanings: Array.isArray(entry.meanings)
+        ? entry.meanings.map(m => ({
+            partOfSpeech: m.partOfSpeech || '',
+            definitions: (m.definitions || []).map(d => ({
+              definition: d.definition || '',
+              example: d.example || ''
+            })).filter(d => d.definition)
+          })).filter(m => m.definitions?.length)
+        : []
+    })).filter(e => e.meanings?.length);
+  };
+
   /**
-   * ✅ Server-side dictionary lookup (canonical Netlify Functions path)
-   * Calls your Netlify Function at /.netlify/functions/define
-   * (This avoids any ambiguity with redirects.)
+   * ✅ Lookup via Netlify Function, with client-side fallback
    */
   const fetchDefinition = async (word) => {
     if (!word) return;
     setDictLoading(true);
     setDictError('');
     setDictEntries(null);
+    setIsDictOpen(true);
 
     try {
+      // 1) Primary: serverless function
       const resp = await fetch(`/.netlify/functions/define?word=${encodeURIComponent(word)}`, {
         cache: 'no-cache',
         headers: { Accept: 'application/json' },
       });
 
-      // Read raw text first (helps debug unexpected non-JSON responses)
       const text = await resp.text();
       let data = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch (e) {
-        // Expose parse issues instead of silently falling back to "No definition found"
+      try { data = text ? JSON.parse(text) : null; } catch (e) {
         setDictError(`Malformed JSON from dictionary function. ${e?.message || 'Parse error.'}`);
-        setDictEntries([]);
-        setDictLoading(false);
-        return;
       }
 
       if (!resp.ok) {
         setDictError(`Lookup failed (${resp.status}). ${text?.slice(0, 200) || 'No response body.'}`);
-        setDictEntries([]);
+      }
+
+      if (data && Array.isArray(data.entries) && data.entries.length > 0) {
+        setDictEntries(data.entries);
+        setDictLoading(false);
         return;
       }
 
-      if (!data || !Array.isArray(data.entries)) {
-        setDictError('Malformed response from dictionary function (missing "entries").');
-        setDictEntries([]);
-        return;
+      // If serverless provided an explicit error, keep it visible—but still try fallback
+      const serverError = (data && data.error) ? ` Server: ${data.error}` : '';
+
+      // 2) Fallback: CORS-friendly client call to DictionaryAPI
+      try {
+        const r2 = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const d2 = await r2.json().catch(() => null);
+        const entries2 = normalizeDictionaryApiClient(d2);
+        if (entries2.length) {
+          setDictEntries(entries2);
+          setDictError(serverError ? `Function failed; used fallback.${serverError}` : '');
+          setDictLoading(false);
+          return;
+        }
+      } catch {
+        // ignore and rely on final error reporting
       }
 
-      setDictEntries(data.entries);
-      if (data.entries.length === 0 && data.error) {
-        // Informational note (e.g., missing param); keep UI consistent
-        setDictError(data.error);
+      // 3) Nothing worked
+      if (!serverError && !dictError) {
+        setDictError('No results from providers.');
+      } else if (serverError) {
+        setDictError(`No results. ${serverError}`);
       }
+      setDictEntries([]);
     } catch (err) {
       setDictError(err?.message || 'Failed to fetch definition.');
       setDictEntries([]);
@@ -448,6 +468,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     fetchDefinition(selectedWord);
   };
   const closeDictionary = () => {
+    setIsDictOpen(false);
     setDictEntries(null);
     setDictError('');
     setDictLoading(false);
@@ -472,7 +493,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         </div>
       </div>
 
-      {/* Centered page with generous whitespace */}
+      {/* Centered page */}
       <div className="flex-grow overflow-hidden flex items-stretch">
         <div className="flex-1 flex items-center justify-center">
           <div
@@ -484,7 +505,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Page content (Typography styles) */}
             <article className="prose prose-lg dark:prose-invert max-w-none">
               {currentPageParas.map((p, i) => (
                 <p key={i} className="text-justify hyphens-auto break-words">{p}</p>
@@ -506,7 +526,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         </div>
       </div>
 
-      {/* Floating "Define" button near selection / long-press point */}
+      {/* Floating "Define" button */}
       {showDefineButton && selectedWord && (
         <button
           onClick={openDefinition}
@@ -517,7 +537,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         </button>
       )}
 
-      {/* Off-screen measurer with same typography styles */}
+      {/* Off-screen measurer */}
       <div
         ref={measurerRef}
         aria-hidden
@@ -525,8 +545,9 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         style={{ visibility: 'hidden', pointerEvents: 'none' }}
       />
 
-      {/* Dictionary modal */}
+      {/* Dictionary modal (opens only after Define) */}
       <DictionaryModal
+        isOpen={isDictOpen}
         word={selectedWord}
         loading={dictLoading}
         error={dictError}
@@ -538,7 +559,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
 };
 
 /* ----------------------
-   Settings & AI panels
+   Settings & AI panels (unchanged)
    ---------------------- */
 const SettingsPanel = ({ isOpen, onClose, isDarkMode, setIsDarkMode }) => {
   if (!isOpen) return null;
@@ -577,7 +598,7 @@ const AiPanel = ({ isOpen, onClose, isLoading, response }) => {
 };
 
 /* ----------------------
-   Footer (appears on every page)
+   Footer
    ---------------------- */
 const Footer = () => (
   <footer className="w-full border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
@@ -591,7 +612,6 @@ const Footer = () => (
    Main App
    ---------------------- */
 export default function App() {
-  // state
   const [library, setLibrary] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
   const [bookContent, setBookContent] = useState(null);
@@ -605,28 +625,22 @@ export default function App() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Disclaimer: show-once behavior
   const [disclaimerOpen, setDisclaimerOpen] = useState(true);
   useEffect(() => {
-    // If user has visited before, hide by default
     const seen = localStorage.getItem('wair_disclaimer_seen');
-    if (seen === 'true') {
-      setDisclaimerOpen(false);
-    } else {
-      // First visit: show it and mark as seen
+    if (seen === 'true') setDisclaimerOpen(false);
+    else {
       localStorage.setItem('wair_disclaimer_seen', 'true');
       setDisclaimerOpen(true);
     }
   }, []);
   const toggleDisclaimer = () => setDisclaimerOpen(o => !o);
 
-  // dark mode toggle
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  // load library.json from public/content/
   useEffect(() => {
     const load = async () => {
       try {
@@ -645,7 +659,6 @@ export default function App() {
     load();
   }, []);
 
-  // book loader
   const handleSelectBook = async (book) => {
     setSelectedBook(book);
     setBookContent(null);
@@ -705,13 +718,6 @@ export default function App() {
     if (selectedBook) handleSelectBook(selectedBook);
   };
 
-  /**
-   * 🔧 TESTING MODE (enabled): Summary shows a fixed message and makes NO network calls.
-   * ✅ To re-enable real summaries:
-   *   1) Comment out this testing function.
-   *   2) UNCOMMENT the "PRODUCTION VERSION" below.
-   *   3) Ensure summarize.js is also switched to PRODUCTION MODE and OPENAI_API_KEY is set.
-   */
   const handleAiSummary = async () => {
     setIsAiPanelOpen(true);
     setIsAiLoading(false);
@@ -720,49 +726,6 @@ export default function App() {
     );
   };
 
-  /* ===================== PRODUCTION VERSION (DISABLED) =====================
-  // ChatGPT summary via Netlify Function
-  const handleAiSummary = async () => {
-    if (!bookContent || !Array.isArray(bookContent.chapters)) return;
-    setIsAiPanelOpen(true);
-    setIsAiLoading(true);
-    setAiResponse('');
-    const chapter = bookContent.chapters[currentChapterIndex];
-    const chapterText = Array.isArray(chapter?.content)
-      ? chapter.content.join(' ')
-      : (typeof chapter?.content === 'string' ? chapter.content : '');
-    if (!chapterText) {
-      setAiResponse('No chapter text available to summarize.');
-      setIsAiLoading(false);
-      return;
-    }
-
-    try {
-      const resp = await fetch('/api/summarize', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          prompt: `Provide a concise, one-paragraph summary (4–6 sentences, neutral tone) of the following chapter:\n\n${chapterText}`
-        })
-      });
-      const text = await resp.text();
-      if (!resp.ok) {
-        setAiResponse(`Summary failed: ${resp.status} ${text.slice(0, 400)}`);
-        setIsAiLoading(false);
-        return;
-      }
-      const data = JSON.parse(text);
-      setAiResponse(data.summary || 'No summary available.');
-    } catch (error) {
-      setAiResponse('Sorry, I was unable to generate a summary at this time.');
-      console.error(error);
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-  // =================== END PRODUCTION VERSION (DISABLED) =================== */
-
-  // Main render
   const renderContent = () => {
     if (isLoading) return <LoadingScreen message="Loading Library..." />;
 
@@ -829,7 +792,6 @@ export default function App() {
         {renderContent()}
       </main>
 
-      {/* Footer appears on every page */}
       <Footer />
 
       <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
