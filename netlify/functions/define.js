@@ -1,17 +1,22 @@
 // netlify/functions/define.js
 import https from 'node:https';
 import { URL } from 'node:url';
+import { ensureUS } from './_geo.js'; // <-- you said you will add this file
 
 export default async (request, context) => {
+  // Geo-restrict to USA
+  const deny = ensureUS(context);
+  if (deny) return deny;
+
   try {
     const url = new URL(request.url);
     const q = (url.searchParams.get('word') || '').trim().toLowerCase();
     if (!q) return json({ entries: [], error: 'Missing "word" query param.' }, 400);
 
     const candidates = unique([q, ...lemmaCandidates(q)]);
-
     let aggregated = [];
     let lastStatuses = [];
+
     for (const term of candidates) {
       const p1 = await dictionaryApi(term);
       lastStatuses.push(p1._status ?? -1);
@@ -22,7 +27,6 @@ export default async (request, context) => {
       if (p2.entries.length) { aggregated = p2.entries; break; }
     }
 
-    // If nothing came back AND all probes look like network errors, surface an error
     const allZero = lastStatuses.length > 0 && lastStatuses.every(s => s === 0);
     if (!aggregated.length && allZero) {
       return json({ entries: [], error: 'Upstream dictionary providers unreachable (network).' }, 200, {
