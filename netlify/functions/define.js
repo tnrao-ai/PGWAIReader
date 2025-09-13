@@ -1,110 +1,130 @@
 // netlify/functions/define.js
-// Server-side dictionary lookup with two passes:
-// 1) free-dictionary (dictionaryapi.dev)
-// 2) Datamuse fallback (md=d)
-// Returns a unified "entries" array compatible with your DictionaryModal.
-
-const DICT_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
-const DATAMUSE = 'https://api.datamuse.com/words';
-
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-};
-
-exports.handler = async (event) => {
+export default async (request, context) => {
   try {
-    if (event.httpMethod === 'OPTIONS') {
-      return { statusCode: 200, headers: cors, body: '' };
-    }
-    if (event.httpMethod !== 'GET') {
-      return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
-    }
+    const url = new URL(request.url);
+    const q = (url.searchParams.get('word') || '').trim().toLowerCase();
+    if (!q) return json({ entries: [], error: 'Missing "word" query param.' }, 400);
 
-    const url = new URL(event.rawUrl || `https://${event.headers.host}${event.path}${event.rawQuery ? `?${event.rawQuery}` : ''}`);
-    const raw = (url.searchParams.get('word') || '').trim();
-    const word = normalizeWord(raw);
-    if (!word) {
-      return json({ entries: [], error: 'Missing or invalid word parameter.' }, 400);
-    }
+    // Try the word, then a few simple lemmas
+    const candidates = unique([q, ...lemmaCandidates(q)]);
 
-    // Pass 1: dictionaryapi.dev
-    const d1 = await tryFreeDictionary(word);
-    if (d1.ok && d1.entries.length > 0) {
-      return json({ entries: d1.entries });
-    }
-
-    // Pass 2: Datamuse fallback
-    const d2 = await tryDatamuse(word);
-    if (d2.ok && d2.entries.length > 0) {
-      return json({ entries: d2.entries });
+    let aggregated = [];
+    for (const term of candidates) {
+      const fromPrimary = await safeDictionaryApi(term);
+      if (fromPrimary.length) {
+        aggregated = fromPrimary;
+        break;
+      }
+      const fromWikt = await safeWiktionary(term);
+      if (fromWikt.length) {
+        aggregated = fromWikt;
+        break;
+      }
     }
 
-    // Nothing found anywhere
-    return json({ entries: [] });
-  } catch (err) {
-    return json({ entries: [], error: err?.message || 'Internal error' }, 500);
-  }
-};
-
-function json(obj, statusCode = 200) {
-  return {
-    statusCode,
-    headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-    body: JSON.stringify(obj),
-  };
-}
-
-function normalizeWord(str) {
-  let w = (str || '').trim();
-  w = w.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[—–]/g, '-');
-  w = w.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, ''); // strip edge punctuation
-  w = w.replace(/('s|’s)$/i, '');                // possessives
-  if (w.includes("'")) w = w.split("'")[0];      // contractions → left part
-  if (w.includes("’")) w = w.split("’")[0];
-  w = w.toLowerCase();
-  const m = w.match(/^[a-z][a-z\-]*$/i);
-  return m ? m[0] : '';
-}
-
-async function tryFreeDictionary(word) {
-  try {
-    const resp = await fetch(DICT_BASE + encodeURIComponent(word));
-    const ct = (resp.headers.get('content-type') || '').toLowerCase();
-    const isJSON = ct.includes('application/json');
-    if (resp.status === 404) return { ok: true, entries: [] };
-    if (!resp.ok) {
-      const msg = isJSON ? JSON.stringify(await resp.json()) : (await resp.text());
-      throw new Error(`dictionaryapi.dev failed (${resp.status}): ${msg.slice(0, 300)}`);
-    }
-    const data = isJSON ? await resp.json() : [];
-    return { ok: true, entries: Array.isArray(data) ? data : [] };
-  } catch (e) {
-    // Consider network/API failure as hard error
-    return { ok: false, entries: [], error: e.message };
-  }
-}
-
-async function tryDatamuse(word) {
-  try {
-    const url = `${DATAMUSE}?sp=${encodeURIComponent(word)}&md=d&max=1`;
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      const t = await resp.text();
-      throw new Error(`Datamuse failed (${resp.status}): ${t.slice(0, 300)}`);
-    }
-    const arr = await resp.json();
-    if (!Array.isArray(arr) || arr.length === 0) return { ok: true, entries: [] };
-    const item = arr[0];
-    const defs = Array.isArray(item.defs) ? item.defs : [];
-    const meanings = defs.map((d) => {
-      const [pos, def] = d.split('\t');
-      return { partOfSpeech: pos || 'definition', definitions: [{ definition: def || d }] };
+    // Always respond with the same shape
+    return json({ entries: aggregated }, 200, {
+      'Cache-Control': 'public, max-age=86400',
+      'Access-Control-Allow-Origin': '*'
     });
-    const entries = meanings.length ? [{ word: item.word || word, phonetic: '', meanings }] : [];
-    return { ok: true, entries };
-  } catch (e) {
-    return { ok: false, entries: [], error: e.message };
+  } catch (err) {
+    return json({ entries: [], error: err?.message || 'Server error' }, 500, {
+      'Access-Control-Allow-Origin': '*'
+    });
   }
+};
+
+/* ---------------- helpers ---------------- */
+
+function json(obj, status = 200, headers = {}) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers }
+  });
+}
+
+function unique(arr) {
+  return [...new Set(arr.filter(Boolean))];
+}
+
+function lemmaCandidates(word) {
+  const out = [];
+  // plural → singular (very rough)
+  if (word.endsWith('ies') && word.length > 3) out.push(word.slice(0, -3) + 'y');
+  if (word.endsWith('es') && word.length > 2) out.push(word.slice(0, -2));
+  if (word.endsWith('s') && !word.endsWith('ss')) out.push(word.slice(0, -1));
+  // verb forms
+  if (word.endsWith('ing') && word.length > 4) {
+    out.push(word.slice(0, -3));
+    out.push(word.slice(0, -3) + 'e'); // running → run, making → make
+  }
+  if (word.endsWith('ed') && word.length > 3) {
+    out.push(word.slice(0, -2));
+    out.push(word.slice(0, -1)); // hoped → hope / loved → love
+  }
+  return unique(out);
+}
+
+async function safeFetchJSON(url, opts = {}, timeoutMs = 5000) {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const resp = await fetch(url, { ...opts, signal: ctrl.signal, headers: { 'User-Agent': 'WodehouseReader/1.0', ...(opts.headers || {}) } });
+    if (!resp.ok) return { ok: false, status: resp.status, data: null };
+    const data = await resp.json().catch(() => null);
+    return { ok: true, status: resp.status, data };
+  } catch {
+    return { ok: false, status: 0, data: null };
+  } finally {
+    clearTimeout(to);
+  }
+}
+
+/* Provider 1: Free Dictionary API (https://api.dictionaryapi.dev/) */
+async function safeDictionaryApi(word) {
+  const { ok, data } = await safeFetchJSON(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+  if (!ok || !Array.isArray(data)) return [];
+  return normalizeDictionaryApi(data);
+}
+
+function normalizeDictionaryApi(arr) {
+  // https://github.com/meetDeveloper/freeDictionaryAPI
+  return arr.map(entry => ({
+    word: entry.word,
+    phonetic: entry.phonetic || (Array.isArray(entry.phonetics) && entry.phonetics[0]?.text) || '',
+    meanings: Array.isArray(entry.meanings)
+      ? entry.meanings.map(m => ({
+          partOfSpeech: m.partOfSpeech || '',
+          definitions: (m.definitions || []).map(d => ({
+            definition: d.definition || '',
+            example: d.example || ''
+          })).filter(d => d.definition)
+        })).filter(m => m.definitions?.length)
+      : []
+  })).filter(e => e.meanings?.length);
+}
+
+/* Provider 2: Wiktionary REST (no key) */
+async function safeWiktionary(word) {
+  // en.wiktionary.org/api/rest_v1/#/Page%20content/get_page_definition__term_
+  const { ok, data } = await safeFetchJSON(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`);
+  if (!ok || !data || typeof data !== 'object') return [];
+  return normalizeWiktionary(word, data);
+}
+
+function normalizeWiktionary(word, data) {
+  const langs = ['en', 'en-us', 'en-gb'];
+  const blocks = langs.flatMap(l => data[l] || []);
+  if (!blocks.length) return [];
+  return [{
+    word,
+    phonetic: '',
+    meanings: blocks.map(b => ({
+      partOfSpeech: b.partOfSpeech || '',
+      definitions: (b.definitions || []).map(d => ({
+        definition: d.definition || '',
+        example: (Array.isArray(d.examples) && d.examples[0]) || ''
+      })).filter(d => d.definition)
+    })).filter(m => m.definitions?.length)
+  }].filter(e => e.meanings?.length);
 }

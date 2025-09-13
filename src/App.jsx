@@ -389,8 +389,9 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   };
 
   /**
-   * ✅ Server-side dictionary lookup (fixes Safari/Chrome/Firefox CORS)
-   * Calls your Netlify Function at /api/define
+   * ✅ Server-side dictionary lookup (canonical Netlify Functions path)
+   * Calls your Netlify Function at /.netlify/functions/define
+   * (This avoids any ambiguity with redirects.)
    */
   const fetchDefinition = async (word) => {
     if (!word) return;
@@ -399,24 +400,40 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     setDictEntries(null);
 
     try {
-      const resp = await fetch(`/api/define?word=${encodeURIComponent(word)}`, {
+      const resp = await fetch(`/.netlify/functions/define?word=${encodeURIComponent(word)}`, {
         cache: 'no-cache',
         headers: { Accept: 'application/json' },
       });
+
+      // Read raw text first (helps debug unexpected non-JSON responses)
       const text = await resp.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (e) {
+        // Expose parse issues instead of silently falling back to "No definition found"
+        setDictError(`Malformed JSON from dictionary function. ${e?.message || 'Parse error.'}`);
+        setDictEntries([]);
+        setDictLoading(false);
+        return;
+      }
+
       if (!resp.ok) {
-        setDictError(`Lookup failed: ${resp.status} ${text.slice(0, 200)}`);
+        setDictError(`Lookup failed (${resp.status}). ${text?.slice(0, 200) || 'No response body.'}`);
         setDictEntries([]);
         return;
       }
-      const data = JSON.parse(text);
-      if (Array.isArray(data.entries) && data.entries.length > 0) {
-        setDictEntries(data.entries);
-      } else {
+
+      if (!data || !Array.isArray(data.entries)) {
+        setDictError('Malformed response from dictionary function (missing "entries").');
         setDictEntries([]);
+        return;
       }
-      if (data.error) {
-        setDictError(data.error); // non-fatal info
+
+      setDictEntries(data.entries);
+      if (data.entries.length === 0 && data.error) {
+        // Informational note (e.g., missing param); keep UI consistent
+        setDictError(data.error);
       }
     } catch (err) {
       setDictError(err?.message || 'Failed to fetch definition.');
@@ -547,7 +564,7 @@ const AiPanel = ({ isOpen, onClose, isLoading, response }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-xl font-bold mb-4 font-serif">AI Summary</h3>
+        <h3 className="text-xl font-bold font-serif">AI Summary</h3>
         {isLoading ? (
           <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div></div>
         ) : (

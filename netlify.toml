@@ -1,28 +1,21 @@
-# Build & publish
-[build]
-  command = "npm run build"
-  publish = "dist"
-  functions = "netlify/functions"
+# --- Netlify config for PGWAIReader ---
 
-# Functions use esbuild bundler (good defaults)
 [functions]
+  directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# API routes (specific first)
-# Chat summary (kept for later production use)
+# Route every /api/* request to the corresponding Netlify Function
+# /api/define      -> /.netlify/functions/define
+# /api/summarize   -> /.netlify/functions/summarize
 [[redirects]]
-  from = "/api/summarize"
-  to = "/.netlify/functions/summarize"
+  from = "/api/*"
+  to   = "/.netlify/functions/:splat"
   status = 200
+  force = true
 
-# Dictionary proxy (server-side lookup to avoid Safari/CORS issues)
-[[redirects]]
-  from = "/api/define"
-  to = "/.netlify/functions/define"
-  status = 200
-
-# SPA fallback (last)
+# (Optional but recommended) SPA fallback for client-side routing
+# If your site is a single-page app, keep this. If not, you can remove it.
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to   = "/index.html"
   status = 200
