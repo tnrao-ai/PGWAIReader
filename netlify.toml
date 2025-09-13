@@ -1,33 +1,28 @@
-# ------------------------------
-# Build configuration
-# ------------------------------
+# Build & publish
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
-# ------------------------------
-# Netlify Functions
-# ------------------------------
+# Functions use esbuild bundler (good defaults)
 [functions]
-  directory = "netlify/functions"
   node_bundler = "esbuild"
 
-[build.environment]
-  NODE_VERSION = "18"
-
-# ------------------------------
-# Redirects
-# ------------------------------
-
-# API route for ChatGPT summaries
+# API routes (specific first)
+# Chat summary (kept for later production use)
 [[redirects]]
   from = "/api/summarize"
   to = "/.netlify/functions/summarize"
   status = 200
 
-# Catch-all redirect for React SPA (must stay last!)
+# Dictionary proxy (server-side lookup to avoid Safari/CORS issues)
+[[redirects]]
+  from = "/api/define"
+  to = "/.netlify/functions/define"
+  status = 200
+
+# SPA fallback (last)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-

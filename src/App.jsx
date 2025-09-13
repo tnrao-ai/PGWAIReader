@@ -23,13 +23,73 @@ const Header = ({ onSettingsClick }) => (
 );
 
 /* ----------------------
-   Library View
+   Legal Disclaimer (with show/hide toggle; show-once)
    ---------------------- */
-const LibraryView = ({ library, onSelectBook }) => (
+const LegalDisclaimer = ({ open, onToggle }) => {
+  return (
+    <section className="mb-6 md:mb-8">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+        {/* Header row with toggle */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="m-0 text-base md:text-lg font-bold">
+            Legal Disclaimer for Wodehouse AI Reader – P.G. Wodehouse Collection
+          </h2>
+          <button
+            onClick={onToggle}
+            className="text-sm px-3 py-1 rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+            aria-expanded={open}
+            aria-controls="disclaimer-body"
+          >
+            {open ? 'Hide' : 'Show'}
+          </button>
+        </div>
+
+        {/* Body (collapsible) */}
+        {open && (
+          <div id="disclaimer-body" className="p-5 sm:p-6">
+            <div className="prose dark:prose-invert max-w-none">
+              <h3 className="mt-0 mb-2 text-base md:text-lg font-semibold">Content Licensing and Attribution</h3>
+              <p className="m-0">
+                All P.G. Wodehouse literary works provided on this web application are made available in strict adherence to all applicable license norms.
+                These works are presented as open access content, enabling anyone with an internet-enabled device to view and share them without payment, with the appropriate permissions.
+              </p>
+              <p>
+                We extend our sincere gratitude and give full credit to <strong>Project Gutenberg</strong> (<a className="underline" href="https://www.gutenberg.org" target="_blank" rel="noreferrer">www.gutenberg.org</a>)
+                for their invaluable efforts in digitizing and making these works freely available online for public access. Project Gutenberg is recognized as a significant resource for providing open access to content of value.
+              </p>
+
+              <h3 className="mt-4 mb-2 text-base md:text-lg font-semibold">Commitment to Open Standards</h3>
+              <p className="m-0">
+                Our platform is dedicated to upholding open standards and open-source principles, ensuring transparency and accessibility in the distribution of literary works.
+              </p>
+
+              <h3 className="mt-4 mb-2 text-base md:text-lg font-semibold">General Information and User Privacy</h3>
+              <p className="m-0">
+                This platform provides access to existing literary works. While AI tools are increasingly used for content generation, this disclaimer pertains to the distribution of original, publicly available works as sourced.
+                We are committed to data privacy and to addressing user concerns regarding data collection and usage. Our practices are designed to promote transparency and informed engagement with online information.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+/* ----------------------
+   Library View (includes Legal Disclaimer + toggle)
+   ---------------------- */
+const LibraryView = ({ library, onSelectBook, disclaimerOpen, onToggleDisclaimer }) => (
   <div className="container mx-auto p-4">
+    <LegalDisclaimer open={disclaimerOpen} onToggle={onToggleDisclaimer} />
+
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
       {library.map(book => (
-        <div key={book.id} onClick={() => onSelectBook(book)} className="cursor-pointer group bg-white rounded-lg shadow hover:shadow-lg overflow-hidden">
+        <div
+          key={book.id}
+          onClick={() => onSelectBook(book)}
+          className="cursor-pointer group bg-white rounded-lg shadow hover:shadow-lg overflow-hidden"
+        >
           <img src={book.coverImage} alt={`Cover of ${book.title}`} className="w-full h-48 object-cover" />
           <div className="p-3">
             <h3 className="font-bold text-sm md:text-base">{book.title}</h3>
@@ -63,9 +123,7 @@ const DictionaryModal = ({ word, loading, error, entries, onClose }) => {
           </div>
         )}
 
-        {!loading && error && (
-          <p className="text-red-600">{error}</p>
-        )}
+        {!loading && error && <p className="text-red-600">{error}</p>}
 
         {!loading && !error && !hasEntries && (
           <p className="text-gray-700 dark:text-gray-300">No definition found.</p>
@@ -99,7 +157,7 @@ const DictionaryModal = ({ word, loading, error, entries, onClose }) => {
 };
 
 /* ----------------------
-   Reading View (sentence-aware pagination + whitespace + dictionary select + mobile long-press)
+   Reading View (sentence-aware pagination + dictionary + mobile long-press)
    ---------------------- */
 const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack, onAiSummary }) => {
   if (!book || !Array.isArray(book.chapters) || book.chapters.length === 0) {
@@ -110,6 +168,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       </div>
     );
   }
+
   const chapter = book.chapters[currentChapterIndex];
   const rawParagraphs = Array.isArray(chapter?.content)
     ? chapter.content
@@ -122,7 +181,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   const [pageIndex, setPageIndex] = useState(0);
 
   // Dictionary states
-  const [selectionText, setSelectionText] = useState('');
   const [selectedWord, setSelectedWord] = useState('');
   const [showDefineButton, setShowDefineButton] = useState(false);
   const [defineBtnPos, setDefineBtnPos] = useState({ x: 0, y: 0 });
@@ -139,25 +197,6 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   const splitIntoSentences = (text) => {
     const matches = text.match(/[^.!?…]+[.!?…]"?'?\)?\s*/g);
     return matches || [text];
-  };
-
-  /** Normalize selected text to a single dictionary-friendly word */
-  const normalizeWord = (str) => {
-    if (!str) return '';
-    let w = str.trim();
-    // normalize punctuation
-    w = w.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[—–]/g, '-');
-    // strip edge punctuation
-    w = w.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '');
-    // possessives
-    w = w.replace(/('s|’s)$/i, '');
-    // contractions → left piece
-    if (w.includes("'")) w = w.split("'")[0];
-    if (w.includes("’")) w = w.split("’")[0];
-    // final filter
-    w = w.toLowerCase();
-    const m = w.match(/^[a-z][a-z\-]*$/i);
-    return m ? m[0] : '';
   };
 
   // Pagination core (measure sentences, end pages at boundaries)
@@ -252,10 +291,14 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   }, [currentChapterIndex, chapter]);
 
   // Navigation
-  const goToNextChapter = () => setCurrentChapterIndex(Math.min(book.chapters.length - 1, currentChapterIndex + 1));
-  const goToPreviousChapter = () => setCurrentChapterIndex(Math.max(0, currentChapterIndex - 1));
-  const goToNextPage = () => setPageIndex(i => Math.min((pages.length || 1) - 1, i + 1));
-  const goToPreviousPage = () => setPageIndex(i => Math.max(0, i - 1));
+  const goToNextChapter = () =>
+    setCurrentChapterIndex(Math.min(book.chapters.length - 1, currentChapterIndex + 1));
+  const goToPreviousChapter = () =>
+    setCurrentChapterIndex(Math.max(0, currentChapterIndex - 1));
+  const goToNextPage = () =>
+    setPageIndex(i => Math.min((pages.length || 1) - 1, i + 1));
+  const goToPreviousPage = () =>
+    setPageIndex(i => Math.max(0, i - 1));
 
   const currentPageParas = pages[pageIndex] || [];
 
@@ -268,40 +311,42 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       const rect = selection.getRangeAt(0).getBoundingClientRect();
       const offsetY = 8;
       setSelectedWord(normalized);
-      setSelectionText(text);
       setDefineBtnPos({ x: rect.left + rect.width / 2, y: rect.top + window.scrollY - offsetY });
       setShowDefineButton(true);
     } else {
       setShowDefineButton(false);
-      setSelectionText('');
       setSelectedWord('');
     }
   };
 
-  // Helpers to detect word at a point (for long-press)
+  // Helpers
+  const normalizeWord = (str) => {
+    if (!str) return '';
+    let w = str.trim();
+    w = w.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[—–]/g, '-');
+    w = w.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, ''); // edge punctuation
+    w = w.replace(/('s|’s)$/i, '');                // possessives
+    if (w.includes("'")) w = w.split("'")[0];      // contractions → left part
+    if (w.includes("’")) w = w.split("’")[0];
+    w = w.toLowerCase();
+    const m = w.match(/^[a-z][a-z\-]*$/i);
+    return m ? m[0] : '';
+  };
+
   const getWordFromPoint = (clientX, clientY) => {
     const range = document.caretRangeFromPoint
       ? document.caretRangeFromPoint(clientX, clientY)
       : null;
     if (!range || !range.startContainer || range.startContainer.nodeType !== Node.TEXT_NODE) return '';
-
     const node = range.startContainer;
-    let offset = range.startOffset;
-
     const text = node.textContent || '';
     if (!text) return '';
-
-    // Expand to word boundaries
-    let start = offset;
-    let end = offset;
-
+    let start = range.startOffset;
+    let end = range.startOffset;
     const isWordChar = (ch) => /[A-Za-z\-]/.test(ch);
-
     while (start > 0 && isWordChar(text[start - 1])) start--;
     while (end < text.length && isWordChar(text[end])) end++;
-
-    const word = text.slice(start, end).trim();
-    return normalizeWord(word);
+    return normalizeWord(text.slice(start, end));
   };
 
   // Mobile long-press handlers
@@ -323,13 +368,11 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       }
       if (word) {
         setSelectedWord(word);
-        setSelectionText(word);
         setDefineBtnPos({ x: clientX, y: window.scrollY + clientY - 8 });
         setShowDefineButton(true);
       }
     }, 550);
   };
-
   const handleTouchMove = (e) => {
     if (!e.touches || e.touches.length === 0) return;
     const { clientX, clientY } = e.touches[0];
@@ -340,16 +383,14 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
       if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
     }
   };
-
   const handleTouchEnd = () => {
     longPressActive.current = false;
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
   };
 
   /**
-   * Stronger dictionary lookup:
-   * 1) Try dictionaryapi.dev
-   * 2) Fallback to Datamuse (md=d) and adapt output
+   * ✅ Server-side dictionary lookup (fixes Safari/Chrome/Firefox CORS)
+   * Calls your Netlify Function at /api/define
    */
   const fetchDefinition = async (word) => {
     if (!word) return;
@@ -357,89 +398,26 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     setDictError('');
     setDictEntries(null);
 
-    // candidate variants (plural/singular, hyphen removal)
-    const candidates = new Set([word]);
-    if (word.includes('-')) candidates.add(word.replace(/-/g, ''));
-    if (word.endsWith('es')) candidates.add(word.slice(0, -2));
-    if (word.endsWith('s')) candidates.add(word.slice(0, -1));
-
-    const tryFreeDictionary = async (w) => {
-      const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`;
-      const resp = await fetch(url, { cache: 'no-cache', headers: { Accept: 'application/json' }, mode: 'cors' });
-      const ct = (resp.headers.get('content-type') || '').toLowerCase();
-      const isJSON = ct.includes('application/json');
-      if (resp.status === 404) return { ok: true, entries: [] }; // “No Definitions Found”
-      if (!resp.ok) {
-        const msg = isJSON ? JSON.stringify(await resp.json()) : (await resp.text());
-        throw new Error(`Dictionary lookup failed (${resp.status}): ${msg.slice(0, 300)}`);
-      }
-      const data = isJSON ? await resp.json() : [];
-      return { ok: true, entries: Array.isArray(data) ? data : [] };
-    };
-
-    const tryDatamuse = async (w) => {
-      const url = `https://api.datamuse.com/words?sp=${encodeURIComponent(w)}&md=d&max=1`;
-      const resp = await fetch(url, { cache: 'no-cache', headers: { Accept: 'application/json' }, mode: 'cors' });
-      if (!resp.ok) {
-        const t = await resp.text();
-        throw new Error(`Datamuse failed (${resp.status}): ${t.slice(0, 300)}`);
-      }
-      const arr = await resp.json();
-      if (!Array.isArray(arr) || arr.length === 0) return { ok: true, entries: [] };
-
-      const item = arr[0];
-      const defs = Array.isArray(item.defs) ? item.defs : [];
-      const meanings = defs.map((d) => {
-        const [pos, def] = d.split('\t');
-        return { partOfSpeech: pos || 'definition', definitions: [{ definition: def || d }] };
-      });
-
-      return {
-        ok: true,
-        entries: meanings.length ? [{ word: item.word || w, phonetic: '', meanings }] : []
-      };
-    };
-
     try {
-      // pass 1: free-dictionary
-      for (const c of candidates) {
-        try {
-          const r = await tryFreeDictionary(c);
-          if (r.ok && r.entries.length > 0) {
-            setDictEntries(r.entries);
-            setDictError('');
-            setDictLoading(false);
-            return;
-          }
-        } catch (e) {
-          setDictError(e?.message || 'Failed to fetch definition.');
-          setDictEntries([]);
-          setDictLoading(false);
-          return;
-        }
+      const resp = await fetch(`/api/define?word=${encodeURIComponent(word)}`, {
+        cache: 'no-cache',
+        headers: { Accept: 'application/json' },
+      });
+      const text = await resp.text();
+      if (!resp.ok) {
+        setDictError(`Lookup failed: ${resp.status} ${text.slice(0, 200)}`);
+        setDictEntries([]);
+        return;
       }
-
-      // pass 2: datamuse
-      for (const c of candidates) {
-        try {
-          const r = await tryDatamuse(c);
-          if (r.ok && r.entries.length > 0) {
-            setDictEntries(r.entries);
-            setDictError('');
-            setDictLoading(false);
-            return;
-          }
-        } catch (e) {
-          setDictError(e?.message || 'Failed to fetch definition (Datamuse).');
-          setDictEntries([]);
-          setDictLoading(false);
-          return;
-        }
+      const data = JSON.parse(text);
+      if (Array.isArray(data.entries) && data.entries.length > 0) {
+        setDictEntries(data.entries);
+      } else {
+        setDictEntries([]);
       }
-
-      // nothing found anywhere
-      setDictEntries([]);
-      setDictError('');
+      if (data.error) {
+        setDictError(data.error); // non-fatal info
+      }
     } catch (err) {
       setDictError(err?.message || 'Failed to fetch definition.');
       setDictEntries([]);
@@ -452,13 +430,11 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     setShowDefineButton(false);
     fetchDefinition(selectedWord);
   };
-
   const closeDictionary = () => {
     setDictEntries(null);
     setDictError('');
     setDictLoading(false);
     setSelectedWord('');
-    setSelectionText('');
   };
 
   return (
@@ -551,7 +527,7 @@ const SettingsPanel = ({ isOpen, onClose, isDarkMode, setIsDarkMode }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-20" onClick={onClose}>
-      <div className="absolute top-0 right-0 h-full w-80 bg-white dark:bg-gray-800 shadow-xl p-6" onClick={e => e.stopPropagation()}>
+      <div className="absolute top-0 right-0 h-full w-80 bg-white dark:bg-gray-800 shadow-xl p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-xl font-bold mb-6">Settings</h3>
         <div className="flex items-center justify-between">
           <label htmlFor="darkModeToggle" className="font-semibold">Dark Mode</label>
@@ -570,7 +546,7 @@ const AiPanel = ({ isOpen, onClose, isLoading, response }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-xl font-bold mb-4 font-serif">AI Summary</h3>
         {isLoading ? (
           <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div></div>
@@ -582,6 +558,17 @@ const AiPanel = ({ isOpen, onClose, isLoading, response }) => {
     </div>
   );
 };
+
+/* ----------------------
+   Footer (appears on every page)
+   ---------------------- */
+const Footer = () => (
+  <footer className="w-full border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+    <div className="container mx-auto px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-300">
+      Texts courtesy <a className="underline" href="https://www.gutenberg.org" target="_blank" rel="noreferrer">Project Gutenberg</a>.
+    </div>
+  </footer>
+);
 
 /* ----------------------
    Main App
@@ -600,6 +587,21 @@ export default function App() {
   const [aiResponse, setAiResponse] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Disclaimer: show-once behavior
+  const [disclaimerOpen, setDisclaimerOpen] = useState(true);
+  useEffect(() => {
+    // If user has visited before, hide by default
+    const seen = localStorage.getItem('wair_disclaimer_seen');
+    if (seen === 'true') {
+      setDisclaimerOpen(false);
+    } else {
+      // First visit: show it and mark as seen
+      localStorage.setItem('wair_disclaimer_seen', 'true');
+      setDisclaimerOpen(true);
+    }
+  }, []);
+  const toggleDisclaimer = () => setDisclaimerOpen(o => !o);
 
   // dark mode toggle
   useEffect(() => {
@@ -793,15 +795,25 @@ export default function App() {
       );
     }
 
-    return <LibraryView library={library} onSelectBook={handleSelectBook} />;
+    return (
+      <LibraryView
+        library={library}
+        onSelectBook={handleSelectBook}
+        disclaimerOpen={disclaimerOpen}
+        onToggleDisclaimer={toggleDisclaimer}
+      />
+    );
   };
 
   return (
-    <div className="min-h-screen text-gray-800 dark:text-gray-200 transition-colors duration-300 bg-gray-50">
+    <div className="min-h-screen flex flex-col text-gray-800 dark:text-gray-200 transition-colors duration-300 bg-gray-50">
       <Header onSettingsClick={() => setIsSettingsOpen(true)} />
-      <main className="container mx-auto p-4 md:p-8">
+      <main className="flex-1 container mx-auto p-4 md:p-8">
         {renderContent()}
       </main>
+
+      {/* Footer appears on every page */}
+      <Footer />
 
       <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
       <AiPanel isOpen={isAiPanelOpen} onClose={() => setIsAiPanelOpen(false)} isLoading={isAiLoading} response={aiResponse} />
