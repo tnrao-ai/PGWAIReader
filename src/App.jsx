@@ -130,7 +130,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   const [dictError, setDictError] = useState('');
   const [dictEntries, setDictEntries] = useState(null);
 
-  // Mobile long-press state (declare ONCE)
+  // Mobile long-press state
   const longPressTimer = useRef(null);
   const longPressActive = useRef(false);
   const lastTouchPoint = useRef({ x: 0, y: 0 });
@@ -141,15 +141,22 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     return matches || [text];
   };
 
-  // Normalize selected text to a single word
+  /** Normalize selected text to a single dictionary-friendly word */
   const normalizeWord = (str) => {
     if (!str) return '';
-    const word = str
-      .trim()
-      .replace(/[“”"‘’'(),.;:!?—–…]/g, ' ')
-      .split(/\s+/)[0]
-      .toLowerCase();
-    const m = word.match(/^[a-z][a-z\-]*$/i);
+    let w = str.trim();
+    // normalize punctuation
+    w = w.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[—–]/g, '-');
+    // strip edge punctuation
+    w = w.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '');
+    // possessives
+    w = w.replace(/('s|’s)$/i, '');
+    // contractions → left piece
+    if (w.includes("'")) w = w.split("'")[0];
+    if (w.includes("’")) w = w.split("’")[0];
+    // final filter
+    w = w.toLowerCase();
+    const m = w.match(/^[a-z][a-z\-]*$/i);
     return m ? m[0] : '';
   };
 
@@ -297,7 +304,7 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     return normalizeWord(word);
   };
 
-  // Mobile long-press handlers (use the ONE set of refs declared above)
+  // Mobile long-press handlers
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return;
     const { clientX, clientY } = e.touches[0];
@@ -339,35 +346,100 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
   };
 
-  // Dictionary lookup (hardened)
+  /**
+   * Stronger dictionary lookup:
+   * 1) Try dictionaryapi.dev
+   * 2) Fallback to Datamuse (md=d) and adapt output
+   */
   const fetchDefinition = async (word) => {
     if (!word) return;
     setDictLoading(true);
     setDictError('');
     setDictEntries(null);
-    try {
-      const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
-      const resp = await fetch(url, {
-        cache: 'no-cache',
-        headers: { 'Accept': 'application/json' },
-        mode: 'cors',
+
+    // candidate variants (plural/singular, hyphen removal)
+    const candidates = new Set([word]);
+    if (word.includes('-')) candidates.add(word.replace(/-/g, ''));
+    if (word.endsWith('es')) candidates.add(word.slice(0, -2));
+    if (word.endsWith('s')) candidates.add(word.slice(0, -1));
+
+    const tryFreeDictionary = async (w) => {
+      const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`;
+      const resp = await fetch(url, { cache: 'no-cache', headers: { Accept: 'application/json' }, mode: 'cors' });
+      const ct = (resp.headers.get('content-type') || '').toLowerCase();
+      const isJSON = ct.includes('application/json');
+      if (resp.status === 404) return { ok: true, entries: [] }; // “No Definitions Found”
+      if (!resp.ok) {
+        const msg = isJSON ? JSON.stringify(await resp.json()) : (await resp.text());
+        throw new Error(`Dictionary lookup failed (${resp.status}): ${msg.slice(0, 300)}`);
+      }
+      const data = isJSON ? await resp.json() : [];
+      return { ok: true, entries: Array.isArray(data) ? data : [] };
+    };
+
+    const tryDatamuse = async (w) => {
+      const url = `https://api.datamuse.com/words?sp=${encodeURIComponent(w)}&md=d&max=1`;
+      const resp = await fetch(url, { cache: 'no-cache', headers: { Accept: 'application/json' }, mode: 'cors' });
+      if (!resp.ok) {
+        const t = await resp.text();
+        throw new Error(`Datamuse failed (${resp.status}): ${t.slice(0, 300)}`);
+      }
+      const arr = await resp.json();
+      if (!Array.isArray(arr) || arr.length === 0) return { ok: true, entries: [] };
+
+      const item = arr[0];
+      const defs = Array.isArray(item.defs) ? item.defs : [];
+      const meanings = defs.map((d) => {
+        const [pos, def] = d.split('\t');
+        return { partOfSpeech: pos || 'definition', definitions: [{ definition: def || d }] };
       });
 
-      const contentType = (resp.headers.get('content-type') || '').toLowerCase();
-      const isJSON = contentType.includes('application/json');
+      return {
+        ok: true,
+        entries: meanings.length ? [{ word: item.word || w, phonetic: '', meanings }] : []
+      };
+    };
 
-      if (resp.status === 404) {
-        setDictEntries([]);
-        setDictError('');
-        return;
-      }
-      if (!resp.ok) {
-        const message = isJSON ? JSON.stringify(await resp.json()) : (await resp.text());
-        throw new Error(`Dictionary lookup failed (${resp.status}): ${message.slice(0, 300)}`);
+    try {
+      // pass 1: free-dictionary
+      for (const c of candidates) {
+        try {
+          const r = await tryFreeDictionary(c);
+          if (r.ok && r.entries.length > 0) {
+            setDictEntries(r.entries);
+            setDictError('');
+            setDictLoading(false);
+            return;
+          }
+        } catch (e) {
+          setDictError(e?.message || 'Failed to fetch definition.');
+          setDictEntries([]);
+          setDictLoading(false);
+          return;
+        }
       }
 
-      const data = isJSON ? await resp.json() : [];
-      setDictEntries(Array.isArray(data) ? data : []);
+      // pass 2: datamuse
+      for (const c of candidates) {
+        try {
+          const r = await tryDatamuse(c);
+          if (r.ok && r.entries.length > 0) {
+            setDictEntries(r.entries);
+            setDictError('');
+            setDictLoading(false);
+            return;
+          }
+        } catch (e) {
+          setDictError(e?.message || 'Failed to fetch definition (Datamuse).');
+          setDictEntries([]);
+          setDictLoading(false);
+          return;
+        }
+      }
+
+      // nothing found anywhere
+      setDictEntries([]);
+      setDictError('');
     } catch (err) {
       setDictError(err?.message || 'Failed to fetch definition.');
       setDictEntries([]);
@@ -614,6 +686,22 @@ export default function App() {
     if (selectedBook) handleSelectBook(selectedBook);
   };
 
+  /**
+   * 🔧 TESTING MODE (enabled): Summary shows a fixed message and makes NO network calls.
+   * ✅ To re-enable real summaries:
+   *   1) Comment out this testing function.
+   *   2) UNCOMMENT the "PRODUCTION VERSION" below.
+   *   3) Ensure summarize.js is also switched to PRODUCTION MODE and OPENAI_API_KEY is set.
+   */
+  const handleAiSummary = async () => {
+    setIsAiPanelOpen(true);
+    setIsAiLoading(false);
+    setAiResponse(
+      "Under testing: Summaries are temporarily disabled. We're validating the reader experience before enabling AI-generated chapter summaries."
+    );
+  };
+
+  /* ===================== PRODUCTION VERSION (DISABLED) =====================
   // ChatGPT summary via Netlify Function
   const handleAiSummary = async () => {
     if (!bookContent || !Array.isArray(bookContent.chapters)) return;
@@ -653,6 +741,7 @@ export default function App() {
       setIsAiLoading(false);
     }
   };
+  // =================== END PRODUCTION VERSION (DISABLED) =================== */
 
   // Main render
   const renderContent = () => {
