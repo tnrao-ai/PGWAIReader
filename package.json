@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "gen:wordweb": "node scripts/wordweb-build.mjs"
+    "gen:quiz": "node scripts/quiz-augment.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.23.12",

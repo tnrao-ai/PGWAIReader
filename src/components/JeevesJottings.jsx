@@ -1,186 +1,285 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { PenSquare, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trophy, RefreshCw, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { centralDateStr, pickDailyQuiz, loadPersisted, persistDaily } from "../utils/dailyPicker";
 
-/* ---------- Seeded RNG so everyone gets same daily set without a server ---------- */
-function mulberry32(a) {
-  return function() {
-    a |= 0; a = a + 0x6D2B79F5 | 0;
-    let t = Math.imul(a ^ a >>> 15, 1 | a);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-function dateSeed() {
-  const d = new Date();
-  const y = d.getFullYear(), m = d.getMonth()+1, day = d.getDate();
-  return parseInt(`${y}${String(m).padStart(2,"0")}${String(day).padStart(2,"0")}`, 10);
-}
-function shuffleDet(arr, seed) {
-  const rng = mulberry32(seed);
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+/**
+ * Jeeves' Jottings — Daily Quiz (10 Qs)
+ * - Pulls from public/content/games/quiz/questions.json (your built bank)
+ * - Deterministic daily pick (America/Chicago), max 1 item per origin
+ * - Unlimited attempts; immediate per-item feedback after "Check answers"
+ * - Persists the day's picked Qs so refresh doesn't reshuffle mid-day
+ *
+ * NOTE: answers are evaluated case-insensitively with punctuation/spacing normalization.
+ */
+
+function normalizeAnswer(s = "") {
+  return (s || "")
+    .toString()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")         // strip diacritics
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[^A-Za-z0-9'"\- ]+/g, " ")     // keep letters/digits/quotes/hyphen/space
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
-/* ---------- Fuzzy match (levenshtein) ---------- */
-function lev(a, b) {
-  a = a.toLowerCase(); b = b.toLowerCase();
-  const dp = Array.from({length: a.length+1}, () => Array(b.length+1).fill(0));
-  for (let i=0;i<=a.length;i++) dp[i][0] = i;
-  for (let j=0;j<=b.length;j++) dp[0][j] = j;
-  for (let i=1;i<=a.length;i++)
-    for (let j=1;j<=b.length;j++)
-      dp[i][j] = Math.min(
-        dp[i-1][j] + 1,
-        dp[i][j-1] + 1,
-        dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)
-      );
-  return dp[a.length][b.length];
-}
-function isCorrect(user, answers) {
-  const u = user.trim().toLowerCase();
-  if (!u) return false;
-  return (answers || []).some(ans => {
-    const a = ans.trim().toLowerCase();
-    return u === a || lev(u, a) <= 2;
-  });
+function isCorrect(userText, correctArr) {
+  const u = normalizeAnswer(userText);
+  return (correctArr || []).some(ans => normalizeAnswer(ans) === u);
 }
 
 export default function JeevesJottings() {
-  const [allQ, setAllQ] = useState([]);
-  const [err, setErr] = useState("");
+  const [seed] = useState(centralDateStr());
   const [loading, setLoading] = useState(true);
+  const [questions, setQuestions] = useState([]); // picked 10 for the day
+  const [answers, setAnswers] = useState({});     // id -> string
+  const [checked, setChecked] = useState(false);  // show correctness
+  const [error, setError] = useState("");
 
-  const seed = useMemo(() => dateSeed(), []);
-  const [answers, setAnswers] = useState({}); // id -> user input
-  const [checked, setChecked] = useState({}); // id -> boolean
-
+  // Load / pick daily
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       setLoading(true);
-      setErr("");
+      setError("");
+
+      // 1) If we already persisted today's pick, use it directly
+      const persisted = loadPersisted(seed);
+      if (persisted && Array.isArray(persisted) && persisted.length > 0) {
+        if (!cancelled) {
+          setQuestions(persisted);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // 2) Fetch full bank and pick 10 (max 1 per origin)
       try {
         const base = import.meta.env.BASE_URL || "/";
         const resp = await fetch(`${base}content/games/quiz/questions.json`, { cache: "no-cache" });
-        if (!resp.ok) throw new Error("Failed to load quiz bank.");
-        const data = await resp.json();
-        setAllQ(Array.isArray(data) ? data : []);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const all = await resp.json();
+        const picked = pickDailyQuiz(all, 10, seed);
+        if (!cancelled) {
+          setQuestions(picked);
+          persistDaily(picked, seed);
+        }
       } catch (e) {
-        setErr(e?.message || "Failed to load quiz.");
+        if (!cancelled) setError("Unable to load the quiz questions. Please try again.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [seed]);
 
-  const todays = useMemo(() => {
-    const picked = shuffleDet(allQ, seed).slice(0, 10);
-    return picked;
-  }, [allQ, seed]);
+  // Map of correctness (after check)
+  const correctness = useMemo(() => {
+    if (!checked) return {};
+    const out = {};
+    for (const q of questions) {
+      out[q.id] = isCorrect(answers[q.id] || "", q.answer);
+    }
+    return out;
+  }, [checked, answers, questions]);
 
-  const score = useMemo(() => {
-    let s = 0;
-    todays.forEach(q => {
-      const u = answers[q.id] || "";
-      if (isCorrect(u, q.answer)) s++;
-    });
-    return s;
-  }, [todays, answers]);
+  const total = questions.length;
+  const correctCount = Object.values(correctness).filter(Boolean).length;
 
-  const badge = score === 10 ? "🥇 Jeeves-level brilliance!"
-              : score >= 8 ? "🥈 Top-notch, old bean!"
-              : score >= 5 ? "🥉 Jolly good show!"
-              : score > 0  ? "🍰 A slice of effort!"
-              : "🙂 Have a bash — unlimited attempts!";
+  const allCorrect = checked && total > 0 && correctCount === total;
 
-  const markAll = () => {
-    const next = {};
-    todays.forEach(q => { next[q.id] = true; });
-    setChecked(next);
+  const onInput = (id, value) => {
+    setAnswers(prev => ({ ...prev, [id]: value }));
   };
 
-  const resetAll = () => {
-    setAnswers({});
-    setChecked({});
+  const onCheck = () => setChecked(true);
+
+  const onTryAgain = () => {
+    // clear only the incorrect answers
+    if (!checked) return;
+    const next = { ...answers };
+    for (const q of questions) {
+      if (!correctness[q.id]) next[q.id] = "";
+    }
+    setAnswers(next);
+    setChecked(false);
   };
+
+  const onResetDay = () => {
+    // Hard reset the day's pick (if you want a new roll for today)
+    localStorage.removeItem(`jj_daily_${seed}`);
+    location.reload();
+  };
+
+  // Skeleton / Loading
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 w-48 bg-gray-200 rounded" />
+          <div className="h-4 w-3/4 bg-gray-200 rounded" />
+          <div className="h-4 w-2/3 bg-gray-200 rounded" />
+          <div className="h-4 w-5/6 bg-gray-200 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800">
+          {error}
+        </div>
+        <button
+          className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200"
+          onClick={() => location.reload()}
+        >
+          <RefreshCw className="w-4 h-4" /> Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6">
+      {/* Title */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <motion.div initial={{ y: -6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 250, damping: 14 }}>
-            <PenSquare className="w-6 h-6 text-blue-600" />
-          </motion.div>
-          <h2 className="text-lg font-bold">Jeeves’ Jottings — Daily Quiz</h2>
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Jeeves’ Jottings — Daily Quiz</h1>
+          <p className="text-sm text-gray-600">Date: {seed} (America/Chicago)</p>
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">10 questions · unlimited attempts</div>
+        <div className="flex items-center gap-2">
+          <button
+            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200"
+            onClick={onResetDay}
+            title="Re-roll today's set (debug)"
+          >
+            <RefreshCw className="w-4 h-4" /> New set
+          </button>
+        </div>
       </div>
 
-      {loading && <div>Loading quiz…</div>}
-      {err && <div className="text-red-600">{err}</div>}
-      {!loading && !err && todays.length === 0 && <div>No questions available.</div>}
+      {/* Explainer */}
+      <div className="mb-6 p-3 sm:p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-3">
+        <HelpCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+        <div className="text-sm leading-relaxed">
+          Type the missing word(s) for each sentence. You can try as many times as you like.
+          We’ll only clear the ones you miss when you click <b>Try again</b>. No two questions in today’s set
+          are variants of the same base prompt—so each one is unique for the day.
+        </div>
+      </div>
 
-      <div className="space-y-4">
-        {todays.map((q, idx) => {
-          const user = answers[q.id] || "";
-          const correct = isCorrect(user, q.answer);
-          const wasChecked = !!checked[q.id];
+      {/* Questions */}
+      <div className="space-y-5">
+        {questions.map((q, idx) => {
+          const answered = answers[q.id] ?? "";
+          const isOk = correctness[q.id] === true;
+          const isWrong = checked && !isOk;
+          const labelId = `q-${idx}`;
+          // split the blank for nicer emphasis (optional)
+          const parts = q.question.split("_____");
 
           return (
             <motion.div
               key={q.id}
-              className="p-4 rounded-lg border bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
+              className={`rounded-lg border p-4 ${isOk ? "border-emerald-300 bg-emerald-50" : isWrong ? "border-rose-300 bg-rose-50" : "border-gray-200 bg-white"}`}
             >
-              <div className="mb-2"><span className="font-semibold">Q{idx+1}.</span> {q.question}</div>
+              <div className="text-sm text-gray-500 mb-1">Q{idx + 1}</div>
+
+              {/* Render the sentence with a highlighted blank */}
+              <div className="text-[15px] sm:text-base leading-relaxed mb-3">
+                {parts.map((chunk, i) => (
+                  <React.Fragment key={i}>
+                    {chunk}
+                    {i < parts.length - 1 && (
+                      <span className="px-2 py-0.5 mx-1 rounded bg-yellow-100 text-yellow-800 whitespace-nowrap">_____</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+
+              <label htmlFor={labelId} className="sr-only">Your answer</label>
               <div className="flex items-center gap-2">
                 <input
-                  value={user}
-                  onChange={(e) => setAnswers(prev => ({...prev, [q.id]: e.target.value}))}
-                  className="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
+                  id={labelId}
+                  type="text"
+                  value={answered}
+                  onChange={(e) => onInput(q.id, e.target.value)}
                   placeholder="Type your answer"
+                  className={`w-full rounded-md border px-3 py-2 outline-none transition
+                    ${isOk ? "border-emerald-400 bg-emerald-50" : isWrong ? "border-rose-400 bg-rose-50" : "border-gray-300 bg-white focus:border-blue-400"}`}
                 />
-                {(wasChecked || user) && (
-                  correct
-                    ? <CheckCircle2 className="w-5 h-5 text-green-600" aria-label="Correct" />
-                    : <XCircle className="w-5 h-5 text-red-600" aria-label="Incorrect" />
-                )}
+                <AnimatePresence initial={false} mode="popLayout">
+                  {checked && isOk && (
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      className="text-emerald-600"
+                      title="Correct"
+                    >
+                      <CheckCircle2 className="w-5 h-5" />
+                    </motion.div>
+                  )}
+                  {checked && isWrong && (
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      className="text-rose-600"
+                      title="Try again"
+                    >
+                      <XCircle className="w-5 h-5" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-              <div className="mt-2 text-sm">
-                {(wasChecked || user) && (
-                  correct
-                    ? <span className="text-green-700">✅ Correct!</span>
-                    : <span className="text-red-700">❌ Not quite — try again.</span>
-                )}
-              </div>
+
+              {/* Show correct answer only when user gets it right (optional): */}
+              {checked && isOk && (
+                <div className="mt-2 text-sm text-emerald-700">
+                  Correct answer: <b>{q.answer[0]}</b>
+                </div>
+              )}
             </motion.div>
           );
         })}
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-base font-semibold">Score: {score}/10 — {badge}</div>
-        <div className="flex gap-2">
-          <button
-            className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2"
-            onClick={markAll}
+      {/* Footer buttons */}
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button
+          onClick={onCheck}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+        >
+          Check answers
+        </button>
+        <button
+          onClick={onTryAgain}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+          disabled={!checked}
+          title={!checked ? "Check answers first" : "Clear the incorrect ones and retry"}
+        >
+          Try again
+        </button>
+
+        {allCorrect && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="ml-auto flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg"
           >
-            <CheckCircle2 className="w-4 h-4" /> Check Answers
-          </button>
-          <button
-            className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2"
-            onClick={resetAll}
-          >
-            <RefreshCw className="w-4 h-4" /> Reset
-          </button>
-        </div>
+            <Trophy className="w-5 h-5" />
+            <span className="font-semibold">Splendid! A perfect score today.</span>
+          </motion.div>
+        )}
       </div>
-    </section>
+    </div>
   );
 }
