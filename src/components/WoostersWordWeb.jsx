@@ -1,398 +1,350 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, RefreshCw, HelpCircle, Lightbulb } from "lucide-react";
+import { HelpCircle, RefreshCw, Lightbulb } from "lucide-react";
 
-const WW_STORE = "wair_ww_progress_v1";
-const WW_HINTS = "wair_ww_hints_v1";
-const MAX_HINTS_PER_DAY = 3;
-
-function todayStr() {
-  return new Date().toISOString().slice(0,10);
+/** ---- Date (America/Chicago) ---- */
+function centralDateStr(d = new Date()) {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const [y, m, day] = fmt.format(d).split("-");
+  return `${y}-${m}-${day}`; // YYYY-MM-DD
 }
 
-async function loadPuzzle(dateStr) {
-  const base = import.meta.env.BASE_URL || "/";
-  const url = `${base}content/games/wordweb/${dateStr}.json`;
-  const resp = await fetch(url, { cache: "no-cache" });
-  if (!resp.ok) throw new Error(`Puzzle not found for ${dateStr}`);
-  return resp.json();
+/** ---- Types & runtime validation ---- */
+const DEFAULT_PUZZLE = {
+  theme: "Wodehouse Sampler",
+  size: 10,
+  grid: [
+    "W O O S T E R S X",
+    "A U N T D A H L I A",
+    "B L A N D I N G S",
+    "E M S W O R T H Z",
+    "G U S S I E N O T",
+    "F I N K N O T T L",
+    "E S C R I P T U R",
+    "E W H I S K Y Y Q",
+    "A G A T H A H I N",
+    "J E E V E S M A P"
+  ].map(r => r.replace(/\s+/g, "")),
+  answers: [
+    "W O O S T E R",
+    "A U N T  D A H L I A",
+    "B L A N D I N G S",
+    "E M S W O R T H",
+    "G U S S I E  F I N K-N O T T L E",
+    "S C R I P T U R E",
+    "W H I S K Y",
+    "A G A T H A",
+    "J E E V E S"
+  ].map(s => s.replace(/\s+/g, "")),
+};
+
+function isString(x) { return typeof x === "string"; }
+function isArray(x) { return Array.isArray(x); }
+
+function normalizeGridRow(row) {
+  // Only A-Z letters in each row
+  const s = String(row || "").toUpperCase().replace(/[^A-Z]/g, "");
+  return s;
+}
+function normalizeAnswer(a) {
+  return String(a || "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, ""); // allow letters only for matching path
 }
 
-function samePath(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-  for (let i=0;i<a.length;i++) if (a[i][0] !== b[i][0] || a[i][1] !== b[i][1]) return false;
-  return true;
+function validatePuzzle(json) {
+  if (!json || typeof json !== "object") return { ok: false, reason: "Not an object" };
+  const theme = isString(json.theme) ? json.theme.trim() : "Untitled";
+  const size = Number.isInteger(json.size) ? json.size : (isArray(json.grid) ? json.grid.length : 0);
+  if (!isArray(json.grid) || json.grid.length < 4) return { ok: false, reason: "grid missing/too small" };
+  const grid = json.grid.map(normalizeGridRow);
+  const N = grid.length;
+  if (grid.some(r => r.length !== N)) return { ok: false, reason: "grid not square" };
+  const answers = (json.answers || []).map(normalizeAnswer).filter(Boolean);
+  if (answers.length === 0) return { ok: false, reason: "no answers" };
+  return { ok: true, value: { theme, size: N, grid, answers } };
 }
 
-function dirBetween(a, b) {
-  // Returns normalized direction [dr, dc] if adjacent; otherwise null
-  const dr = b[0] - a[0];
-  const dc = b[1] - a[1];
-  if (dr === 0 && dc === 0) return null;
-  if (Math.abs(dr) > 1 || Math.abs(dc) > 1) return null;
-  return [Math.sign(dr), Math.sign(dc)];
-}
+/** ---- Selection helpers (supports straight + diagonals + backtrack) ---- */
+const DIRS = [
+  [1,0],[0,1],[-1,0],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]
+];
+function inBounds(x,y,N){ return x>=0 && y>=0 && x<N && y<N; }
+
+/** ---- Hints timing ---- */
+const HINT_IDLE_MS = 20000;
 
 export default function WoostersWordWeb() {
-  const [dateStr, setDateStr] = useState(todayStr());
-  const [puz, setPuz] = useState(null);
-  const [error, setError] = useState("");
+  const seed = centralDateStr();
   const [loading, setLoading] = useState(true);
+  const [puzzle, setPuzzle] = useState(null);
+  const [error, setError] = useState("");
+  const [found, setFound] = useState(new Set()); // normalized answers
+  const [path, setPath] = useState([]);          // [{x,y}]
+  const [isDown, setIsDown] = useState(false);
+  const [lastMoveTs, setLastMoveTs] = useState(Date.now());
+  const idleTimer = useRef(null);
 
-  const [selection, setSelection] = useState([]);     // [[r,c], ...]
-  const [dragging, setDragging] = useState(false);
-  const [lockedDir, setLockedDir] = useState(null);   // [dr, dc] once second cell chosen
-  const [solved, setSolved] = useState([]);           // indices into puz.answers
-  const [hintFlash, setHintFlash] = useState([]);     // coords to briefly highlight
-  const [showHelp, setShowHelp] = useState(false);
-  const [hintCount, setHintCount] = useState(0);
+  const N = puzzle?.size || 0;
 
-  const boardRef = useRef(null);
-
-  // Load progress
+  /** Load today’s JSON with fallbacks */
   useEffect(() => {
-    try {
-      const store = JSON.parse(localStorage.getItem(WW_STORE) || "{}");
-      const s = store[dateStr];
-      if (Array.isArray(s)) setSolved(s);
-    } catch {}
-    try {
-      const hints = JSON.parse(localStorage.getItem(WW_HINTS) || "{}");
-      setHintCount(hints[dateStr] || 0);
-    } catch { setHintCount(0); }
-  }, [dateStr]);
+    let cancelled = false;
+    const base = import.meta.env.BASE_URL || "/";
 
-  // Persist progress
-  useEffect(() => {
-    const store = (() => { try { return JSON.parse(localStorage.getItem(WW_STORE) || "{}"); } catch { return {}; } })();
-    store[dateStr] = solved;
-    localStorage.setItem(WW_STORE, JSON.stringify(store));
-  }, [dateStr, solved]);
+    async function tryFetch(url) {
+      const resp = await fetch(url, { cache: "no-cache" }).catch(() => null);
+      if (!resp || !resp.ok) return null;
+      const text = await resp.text();
+      // Avoid passing bad strings to JSON.parse without guard
+      try { return JSON.parse(text); }
+      catch { return null; }
+    }
 
-  // Load puzzle
-  useEffect(() => {
     (async () => {
       setLoading(true);
       setError("");
-      setSelection([]);
-      setSolved([]);
-      setLockedDir(null);
-      setHintFlash([]);
-      try {
-        const data = await loadPuzzle(dateStr);
-        setPuz(data);
-      } catch (e) {
-        setError(e?.message || "Failed to load puzzle.");
-        setPuz(null);
-      } finally {
-        setLoading(false);
+
+      // 1) Day-specific
+      const dayUrl = `${base}content/games/wordweb/daily/${seed}.json?v=${seed}`;
+      let data = await tryFetch(dayUrl);
+
+      // 2) Fallback to latest.json
+      if (!data) {
+        const latestUrl = `${base}content/games/wordweb/latest.json?v=${seed}`;
+        data = await tryFetch(latestUrl);
       }
+
+      // 3) Fallback to in-code default
+      if (!data) data = DEFAULT_PUZZLE;
+
+      const validated = validatePuzzle(data);
+      if (!validated.ok) {
+        setError(`Could not load puzzle: ${validated.reason}`);
+        setPuzzle(DEFAULT_PUZZLE);
+      } else {
+        setPuzzle(validated.value);
+      }
+
+      if (!cancelled) setLoading(false);
     })();
-  }, [dateStr]);
 
-  // Normalize grid rows
-  const grid = useMemo(() => {
-    if (!puz?.grid) return [];
-    return puz.grid.map(row => (row.includes(" ") ? row.split(" ").map(x => x.trim()) : row.split("")));
-  }, [puz]);
+    return () => { cancelled = true; };
+  }, [seed]);
 
-  const rows = grid.length;
-  const cols = grid[0]?.length || 0;
+  /** Idle hint timer */
+  useEffect(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      // trigger a subtle hint by nudging the theme line (CSS pulse via state flip)
+      setLastMoveTs(Date.now()); // just to redraw/pulse
+    }, HINT_IDLE_MS);
+    return () => idleTimer.current && clearTimeout(idleTimer.current);
+  }, [lastMoveTs, puzzle, found]);
 
-  const allSolved = puz && Array.isArray(puz.answers) && solved.length === puz.answers.length;
+  const themePulse = useMemo(() => ({ key: lastMoveTs }), [lastMoveTs]);
 
-  // ======== Selection mechanics (precise straight-line with backtrack) ========
-  const beginSelection = (r, c) => {
-    setDragging(true);
-    setSelection([[r,c]]);
-    setLockedDir(null);
+  /** Build letter grid */
+  const letters = useMemo(() => {
+    if (!puzzle) return [];
+    return puzzle.grid.map(r => r.split(""));
+  }, [puzzle]);
+
+  /** Mouse/touch interactions */
+  const startSelect = (x,y) => {
+    if (!inBounds(x,y,N)) return;
+    setIsDown(true);
+    setPath([{x,y}]);
+    setLastMoveTs(Date.now());
   };
+  const extendSelect = (x,y) => {
+    if (!isDown || !inBounds(x,y,N)) return;
+    setLastMoveTs(Date.now());
+    setPath(prev => {
+      if (prev.length === 0) return [{x,y}];
 
-  const extendSelection = (r, c) => {
-    if (!dragging) return;
-    setSelection(prev => {
-      if (prev.length === 0) return [[r,c]];
-
-      const last = prev[prev.length - 1];
-
-      // Backtrack support: if moving back to the previous cell, pop last
+      const last = prev[prev.length-1];
+      // backtrack one?
       if (prev.length >= 2) {
-        const prevCell = prev[prev.length - 2];
-        if (r === prevCell[0] && c === prevCell[1]) {
-          const copy = prev.slice(0, prev.length - 1);
-          // If we popped back to length 1, unlock direction
-          if (copy.length < 2) setLockedDir(null);
-          return copy;
+        const prev2 = prev[prev.length-2];
+        if (prev2.x === x && prev2.y === y) {
+          return prev.slice(0, -1); // pop last
         }
       }
 
-      // Must be adjacent
-      const d = dirBetween(last, [r,c]);
-      if (!d) return prev;
-
-      // If we don’t have a locked direction yet and this is the 2nd unique cell, lock it
-      if (!lockedDir && !(r === last[0] && c === last[1])) {
-        setLockedDir(d);
-        return [...prev, [r,c]];
-      }
-
-      // If we have a locked direction, only accept cells continuing that direction from the last
-      if (lockedDir) {
-        if (d[0] === lockedDir[0] && d[1] === lockedDir[1]) {
-          return [...prev, [r,c]];
-        }
-        // Ignore off-line moves
-        return prev;
-      }
-
-      // Fallback (shouldn’t happen): just add if unique
-      if (!(r === last[0] && c === last[1])) return [...prev, [r,c]];
-      return prev;
+      // must be neighbor in 8 directions
+      const dx = x - last.x, dy = y - last.y;
+      if (!DIRS.some(([ax,ay]) => ax===dx && ay===dy)) return prev;
+      // avoid duplicates unless backtracking
+      if (prev.find(p => p.x===x && p.y===y)) return prev;
+      return [...prev, {x,y}];
     });
   };
+  const endSelect = () => {
+    if (!isDown || !puzzle) { setIsDown(false); return; }
+    setIsDown(false);
 
-  const finishSelection = () => {
-    if (!dragging) return;
-    setDragging(false);
-    evaluateSelection();
-  };
-
-  const evaluateSelection = () => {
-    if (!puz?.answers) return;
-    const idx = puz.answers.findIndex((ans, i) => !solved.includes(i) && samePath(ans.path, selection));
-    if (idx >= 0) {
-      setSolved(prev => [...prev, idx]);
+    if (path.length >= 2) {
+      const word = path.map(p => letters[p.y][p.x]).join(""); // X increases to right; Y down
+      const norm = word.toUpperCase().replace(/[^A-Z]/g, "");
+      // If matches any target (forward or reversed), mark found
+      const rev = norm.split("").reverse().join("");
+      const target = puzzle.answers.find(a => a === norm || a === rev);
+      if (target) {
+        setFound(prev => new Set([...prev, target]));
+      }
     }
-    setSelection([]);
-    setLockedDir(null);
+    setPath([]);
   };
 
-  // Mouse
-  const onCellMouseDown = (r, c) => beginSelection(r, c);
-  const onCellMouseEnter = (r, c) => extendSelection(r, c);
-  useEffect(() => {
-    const up = () => finishSelection();
-    window.addEventListener("mouseup", up);
-    return () => window.removeEventListener("mouseup", up);
-  });
-
-  // Touch (drag within board)
-  const onTouchStart = (r, c) => beginSelection(r, c);
-  const onTouchMove = (e) => {
-    if (!dragging) return;
-    const rect = boardRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const touch = e.touches[0];
-    if (!touch) return;
-    const { clientX, clientY } = touch;
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    const cellSize = 38; // ~2.4rem minus gap; fixed to keep math stable
-    const gap = 6;
-    const per = cellSize + gap;
-
-    const c = Math.max(0, Math.min(cols-1, Math.floor(x / per)));
-    const r = Math.max(0, Math.min(rows-1, Math.floor(y / per)));
-
-    extendSelection(r, c);
-  };
-  const onTouchEnd = () => finishSelection();
-
-  const resetProgress = () => {
-    setSolved([]);
-    setSelection([]);
-    setLockedDir(null);
+  const resetAll = () => {
+    setFound(new Set());
+    setPath([]);
+    setLastMoveTs(Date.now());
   };
 
-  // ======== Subtle Hints ========
-  const triggerHint = () => {
-    if (!puz?.answers || hintCount >= MAX_HINTS_PER_DAY) return;
+  const allFound = puzzle && found.size >= (puzzle.answers?.length || 0);
 
-    // pick a random unsolved answer
-    const unsolved = puz.answers
-      .map((a, i) => ({ i, a }))
-      .filter(({ i }) => !solved.includes(i));
-    if (unsolved.length === 0) return;
-
-    const pick = unsolved[Math.floor(Math.random() * unsolved.length)].a;
-
-    // If any part of that path is already selected (rare since selection clears), use the next cell; else first cell
-    const nextCoord = pick.path[0]; // simple, subtle nudge: show the starting cell
-
-    setHintFlash([nextCoord]);
-    setTimeout(() => setHintFlash([]), 1500);
-
-    // record hint usage
-    const hints = (() => { try { return JSON.parse(localStorage.getItem(WW_HINTS) || "{}"); } catch { return {}; } })();
-    const used = (hints[dateStr] || 0) + 1;
-    hints[dateStr] = used;
-    localStorage.setItem(WW_HINTS, JSON.stringify(hints));
-    setHintCount(used);
-  };
-
-  const isHintCell = (r, c) => hintFlash.some(([rr, cc]) => rr === r && cc === c);
+  /** Render */
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 w-48 bg-gray-200 rounded" />
+          <div className="h-4 w-3/4 bg-gray-200 rounded" />
+          <div className="h-64 w-full bg-gray-200 rounded" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <motion.div initial={{ rotate: -10, scale: 0.9 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: "spring", stiffness: 200, damping: 12 }}>
-            <Trophy className="w-6 h-6 text-yellow-500" />
-          </motion.div>
-          <h2 className="text-lg font-bold">Wooster’s Word Web</h2>
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 select-none">
+      {/* Header / controls */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Wooster’s Word Web</h1>
+          <p className="text-sm text-gray-600">Date: {seed} (America/Chicago)</p>
         </div>
         <div className="flex items-center gap-2">
           <button
-            title="Hint"
-            disabled={hintCount >= MAX_HINTS_PER_DAY}
-            className={`px-2 py-1 rounded-lg flex items-center gap-1 ${hintCount >= MAX_HINTS_PER_DAY
-              ? "bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
-              : "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"}`}
-            onClick={triggerHint}
+            onClick={resetAll}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200"
+            title="Reset"
           >
-            <Lightbulb className="w-5 h-5 text-amber-500" />
-            <span className="text-sm">Hint ({MAX_HINTS_PER_DAY - hintCount} left)</span>
+            <RefreshCw className="w-4 h-4" /> Reset
           </button>
           <button
+            onClick={() => setLastMoveTs(Date.now())}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-amber-100 hover:bg-amber-200"
+            title="Hint nudge"
+          >
+            <Lightbulb className="w-4 h-4" /> Hint
+          </button>
+          <button
+            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200"
             title="How to play"
-            className="px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
-            onClick={() => setShowHelp(true)}
+            onClick={() => alert("Drag to connect letters. Straight or diagonal. Backtrack to unselect the last tile. Find all themed words!")}
           >
-            <HelpCircle className="w-5 h-5" />
+            <HelpCircle className="w-4 h-4" /> How
           </button>
-          <button
-            title="Reset today’s progress"
-            className="px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
-            onClick={resetProgress}
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
-          <div className="text-sm text-gray-600 dark:text-gray-400">{dateStr}</div>
         </div>
       </div>
 
-      {loading && <div>Loading puzzle…</div>}
-      {error && <div className="text-red-600">{error}</div>}
-
-      {puz && (
-        <>
-          <div className="mb-3">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Theme</div>
-            <div className="text-base font-semibold">{puz.theme}</div>
-          </div>
-
-          <div
-            ref={boardRef}
-            className="inline-grid select-none touch-none"
-            style={{
-              gridTemplateColumns: `repeat(${cols}, 2.4rem)`,
-              gridAutoRows: "2.4rem",
-              gap: "6px"
-            }}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
+      {/* Theme / errors */}
+      <AnimatePresence initial={false}>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="mb-3 p-3 rounded border border-rose-200 bg-rose-50 text-rose-800 text-sm"
           >
-            {grid.map((row, r) =>
-              row.map((ch, c) => {
-                const inSel = selection.some(([rr,cc]) => rr===r && cc===c);
-                const solvedCell = (puz.answers || []).some((ans, i) =>
-                  solved.includes(i) && ans.path.some(([rr,cc]) => rr===r && cc===c)
-                );
-                const hinted = isHintCell(r, c);
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-                const baseClasses = `w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-md border text-base font-semibold cursor-pointer select-none`;
-                const bgClasses = solvedCell
-                  ? "bg-green-600 text-white border-green-600"
-                  : inSel
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-700";
+      <motion.div
+        key={themePulse.key}
+        initial={{ opacity: 0.85 }}
+        animate={{ opacity: 1 }}
+        className="mb-4 p-3 rounded border border-blue-200 bg-blue-50 text-blue-900"
+      >
+        <div className="text-sm">Theme</div>
+        <div className="font-semibold">{puzzle?.theme || "—"}</div>
+      </motion.div>
 
+      {/* Grid */}
+      {puzzle && (
+        <div
+          className="inline-block"
+          onMouseLeave={endSelect}
+          onMouseUp={endSelect}
+          role="grid"
+          aria-label="Word web grid"
+        >
+          <div
+            className="grid bg-white rounded-lg shadow border border-gray-200 overflow-hidden"
+            style={{
+              gridTemplateColumns: `repeat(${N}, 2.25rem)`,
+              gridTemplateRows: `repeat(${N}, 2.25rem)`,
+            }}
+            onTouchEnd={endSelect}
+          >
+            {letters.map((row, y) =>
+              row.map((ch, x) => {
+                const inPath = path.some(p => p.x === x && p.y === y);
+                const selectedStyle = inPath ? "bg-yellow-200 ring-2 ring-yellow-500" : "bg-white";
+                // helpful role/handlers
                 return (
-                  <motion.div
-                    key={`${r}-${c}`}
-                    onMouseDown={() => onCellMouseDown(r, c)}
-                    onMouseEnter={() => onCellMouseEnter(r, c)}
-                    onTouchStart={() => onTouchStart(r, c)}
-                    className={`${baseClasses} ${bgClasses} ${hinted ? "ring-2 ring-amber-400" : ""}`}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  <div
+                    key={`${x}-${y}`}
+                    role="gridcell"
+                    className={`w-9 h-9 flex items-center justify-center border border-gray-100 font-semibold cursor-pointer select-none ${selectedStyle}`}
+                    onMouseDown={() => startSelect(x,y)}
+                    onMouseEnter={() => extendSelect(x,y)}
+                    onTouchStart={(e) => { e.preventDefault(); startSelect(x,y); }}
+                    onTouchMove={(e) => {
+                      const t = e.touches[0];
+                      const el = document.elementFromPoint(t.clientX, t.clientY);
+                      if (!el) return;
+                      const attr = el.getAttribute("data-cell");
+                      if (attr) {
+                        const [xx,yy] = attr.split(",").map(n => parseInt(n,10));
+                        extendSelect(xx,yy);
+                      }
+                    }}
+                    data-cell={`${x},${y}`}
                   >
-                    {ch.toUpperCase()}
-                  </motion.div>
+                    {ch}
+                  </div>
                 );
               })
             )}
           </div>
-
-          <div className="mt-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Solved: {solved.length} / {(puz.answers || []).length}
-            </div>
-
-            <AnimatePresence>
-              {allSolved && (
-                <motion.div
-                  className="mt-3 text-lg flex items-center gap-2"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                >
-                  🏆 <span>Splendid! You’ve untangled the web like Jeeves at his best.</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {!!solved.length && (
-              <div className="mt-3 text-sm">
-                <div className="font-semibold mb-1">Found words</div>
-                <ul className="list-disc pl-5">
-                  {puz.answers
-                    .map((a, i) => ({ a, i }))
-                    .filter(({ i }) => solved.includes(i))
-                    .map(({ a, i }) => <li key={i}>{a.text}</li>)}
-                </ul>
-              </div>
-            )}
-          </div>
-        </>
+        </div>
       )}
 
-      <AnimatePresence>
-        {showHelp && (
-          <motion.div
-            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowHelp(false)}
-          >
-            <motion.div
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg"
-              initial={{ scale: 0.95, y: 20, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.95, y: 20, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-bold mb-2">How to play</h3>
-              <ul className="text-sm text-gray-700 dark:text-gray-300 list-disc pl-5 space-y-2">
-                <li>Click (or tap) a starting letter, then drag in a straight line. After the second cell, your path locks to that direction (up, down, left, right, or diagonal).</li>
-                <li>To correct mistakes, simply drag back over the previous cell to undo (backtrack).</li>
-                <li>Release to submit the current path. If it matches a hidden answer exactly, it locks in green.</li>
-                <li>Need a nudge? Use <strong>Hint</strong> — it briefly highlights the next starting cell. You have {MAX_HINTS_PER_DAY} hints per day.</li>
-              </ul>
-              <div className="mt-4 text-right">
-                <button
-                  className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
-                  onClick={() => setShowHelp(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </section>
+      {/* Found summary */}
+      <div className="mt-4 text-sm text-gray-700">
+        Found: {found.size} / {puzzle?.answers?.length || 0}
+      </div>
+
+      {allFound && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 p-3 rounded border border-emerald-200 bg-emerald-50 text-emerald-800"
+        >
+          Splendid! You’ve netted the whole web.
+        </motion.div>
+      )}
+    </div>
   );
 }
