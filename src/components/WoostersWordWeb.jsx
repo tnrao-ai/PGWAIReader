@@ -189,10 +189,19 @@ export default function WoostersWordWeb() {
     async function fetchJSON(url) {
       try {
         const r = await fetch(url, { cache: "no-cache" });
-        if (!r.ok) return null;
-        const t = await r.text();
-        try { return JSON.parse(t); } catch { return null; }
-      } catch { return null; }
+        const text = await r.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch {}
+        if (!r.ok) {
+          const msg = data && data.error ? data.error : `HTTP ${r.status}`;
+          console.warn("wordweb fetch failed:", url, msg);
+          return null;
+        }
+        return data;
+      } catch (e) {
+        console.warn("wordweb fetch error:", url, e?.message || e);
+        return null;
+      }
     }
 
     (async () => {
@@ -227,7 +236,7 @@ export default function WoostersWordWeb() {
         setFoundPaths(filterFoundPaths(persisted.foundPaths || {}, safe.answers));
       } else {
         setPuzzle(v.value);
-        if (v.value.notes?.length) setRepairNotes(v.value.notes); // we keep state, but do not render
+        if (v.value.notes?.length) setRepairNotes(v.value.notes); // kept, not rendered
         setFound(new Set((persisted.found || []).filter(a => v.value.answers.includes(a))));
         setFoundPaths(filterFoundPaths(persisted.foundPaths || {}, v.value.answers));
       }
