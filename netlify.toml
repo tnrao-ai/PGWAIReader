@@ -3,6 +3,10 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  # Ensure the words list is bundled with functions (in addition to per-function config).
+  included_files = [
+    "public/content/games/wordweb/words.txt"
+  ]
 
 # Route every /api/* request to the corresponding Netlify Function
 # /api/define      -> /.netlify/functions/define
@@ -13,9 +17,37 @@
   status = 200
   force = true
 
-# (Optional but recommended) SPA fallback for client-side routing
-# If your site is a single-page app, keep this. If not, you can remove it.
+# -----------------------------
+# SPA fallback (client-side routing)
+# -----------------------------
 [[redirects]]
   from = "/*"
   to   = "/index.html"
   status = 200
+
+# -----------------------------
+# Headers to avoid stale caches
+# -----------------------------
+
+# Make sure Word Web assets (if you ever serve static JSON there) are always fresh.
+[[headers]]
+  for = "/content/games/wordweb/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# Quiz bank: ensure the browser fetches the latest daily.
+[[headers]]
+  for = "/content/games/quiz/questions.json"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# -----------------------------
+# Local dev (optional but handy)
+# Adjust if you use a different dev server.
+# -----------------------------
+[dev]
+  framework = "vite"   # change/remove if not using Vite
+  command = "npm run dev"
+  targetPort = 5173    # Vite default
+  port = 8888          # Netlify Dev proxy port
+  autoLaunch = false
