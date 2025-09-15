@@ -72,21 +72,17 @@ function validateAndRepair(json) {
   const rand = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));
 
   // Exactly N rows
-  if (grid.length !== N) notes.push(`Adjusted row count from ${grid.length} to ${N}.`);
+  if (grid.length !== N) { /* internal note only; no UI print */ }
   grid = [...grid];
   while (grid.length < N) grid.push("");
   if (grid.length > N) grid = grid.slice(0, N);
 
   // Each row length == N
-  grid = grid.map((r, i) => {
+  grid = grid.map((r) => {
     let rr = r;
     if (rr.length < N) {
-      const pad = N - rr.length;
-      notes.push(`Row ${i + 1}: padded ${pad} random letters.`);
       while (rr.length < N) rr += rand();
     } else if (rr.length > N) {
-      const cut = rr.length - N;
-      notes.push(`Row ${i + 1}: trimmed ${cut} overflow letters.`);
       rr = rr.slice(0, N);
     }
     return rr;
@@ -163,7 +159,7 @@ export default function WoostersWordWeb() {
   const [loading, setLoading] = useState(true);
   const [puzzle, setPuzzle] = useState(null);
   const [error, setError] = useState("");
-  const [repairNotes, setRepairNotes] = useState([]);
+  const [repairNotes, setRepairNotes] = useState([]); // kept for state hygiene; not rendered
 
   // live selection path
   const [path, setPath] = useState([]); // [{x,y}]
@@ -189,7 +185,6 @@ export default function WoostersWordWeb() {
   /* ----- load daily w/ fallbacks + rehydrate persistence ----- */
   useEffect(() => {
     let cancelled = false;
-    const base = import.meta.env.BASE_URL || "/";
 
     async function fetchJSON(url) {
       try {
@@ -210,12 +205,16 @@ export default function WoostersWordWeb() {
       const persisted = loadFound(seed);
       setRevealsUsed(persisted.reveals);
 
-      const dayUrl = `${base}content/games/wordweb/daily/${seed}.json?v=${seed}`;
-      let raw = await fetchJSON(dayUrl);
+      // 1) Try Netlify function first (live generation)
+      let raw = await fetchJSON(`/.netlify/functions/wordweb?date=${seed}`);
+
+      // 2) Fallback to static files if function not available
       if (!raw) {
-        const latestUrl = `${base}content/games/wordweb/latest.json?v=${seed}`;
-        raw = await fetchJSON(latestUrl);
+        const base = import.meta.env.BASE_URL || "/";
+        const dayUrl = `${base}content/games/wordweb/daily/${seed}.json?v=${seed}`;
+        raw = await fetchJSON(dayUrl) || await fetchJSON(`${base}content/games/wordweb/latest.json?v=${seed}`);
       }
+
       if (!raw) raw = DEFAULT_PUZZLE;
 
       const v = validateAndRepair(raw);
@@ -228,7 +227,7 @@ export default function WoostersWordWeb() {
         setFoundPaths(filterFoundPaths(persisted.foundPaths || {}, safe.answers));
       } else {
         setPuzzle(v.value);
-        if (v.value.notes?.length) setRepairNotes(v.value.notes);
+        if (v.value.notes?.length) setRepairNotes(v.value.notes); // we keep state, but do not render
         setFound(new Set((persisted.found || []).filter(a => v.value.answers.includes(a))));
         setFoundPaths(filterFoundPaths(persisted.foundPaths || {}, v.value.answers));
       }
@@ -291,22 +290,38 @@ export default function WoostersWordWeb() {
     setLastMoveTs(Date.now());
     setPath((prev) => {
       if (prev.length === 0) return [{ x, y }];
-      const last = prev[prev.length - 1];
 
-      // backtrack one step
-      if (prev.length >= 2) {
-        const prev2 = prev[prev.length - 2];
-        if (prev2.x === x && prev2.y === y) return prev.slice(0, -1);
+      const a = prev.length >= 2 ? prev[prev.length - 2] : null;
+      const b = prev[prev.length - 1];
+      const c = { x, y };
+
+      // If staying on the same cell, ignore
+      if (b.x === c.x && b.y === c.y) return prev;
+
+      // ---- Smart backtrack to ANY earlier node ----
+      const idx = prev.findIndex((p) => p.x === c.x && p.y === c.y);
+      if (idx !== -1) {
+        return prev.slice(0, idx + 1);
       }
 
-      // must be 8-neighbor adjacent
-      const ax = Math.abs(x - last.x);
-      const ay = Math.abs(y - last.y);
-      if ((ax <= 1 && ay <= 1) && !(ax === 0 && ay === 0)) {
-        if (prev.some((p) => p.x === x && p.y === y)) return prev; // no revisits
-        return [...prev, { x, y }];
+      // must be 8-neighbor adjacent from last node b
+      const ax = Math.abs(c.x - b.x);
+      const ay = Math.abs(c.y - b.y);
+      const isAdjacent = (ax <= 1 && ay <= 1) && !(ax === 0 && ay === 0);
+      if (!isAdjacent) return prev;
+
+      // Corner-snap to intended diagonal
+      if (a) {
+        const diagFromA = Math.abs(c.x - a.x) === 1 && Math.abs(c.y - a.y) === 1;
+        const bIsOrthOfA =
+          (b.x === a.x && Math.abs(b.y - a.y) === 1) ||
+          (b.y === a.y && Math.abs(b.x - a.x) === 1);
+        if (diagFromA && bIsOrthOfA) {
+          return [...prev.slice(0, -1), c];
+        }
       }
-      return prev;
+
+      return [...prev, c];
     });
   };
 
@@ -441,7 +456,7 @@ export default function WoostersWordWeb() {
         </div>
       </div>
 
-      {/* Error + repair notes */}
+      {/* Error (repair notes removed from UI) */}
       <AnimatePresence initial={false}>
         {error && (
           <motion.div
@@ -454,11 +469,6 @@ export default function WoostersWordWeb() {
           </motion.div>
         )}
       </AnimatePresence>
-      {!!repairNotes.length && (
-        <div className="mb-3 p-2 rounded border border-amber-200 bg-amber-50 text-amber-900 text-xs">
-          Adjustments applied: {repairNotes.join(" ")}
-        </div>
-      )}
 
       {/* Theme (gentle pulse on idle) */}
       <motion.div
