@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, RefreshCw, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { Trophy, RefreshCw, CheckCircle2, XCircle, HelpCircle, Lightbulb } from "lucide-react";
 import { centralDateStr, pickDailyQuiz, loadPersisted, persistDaily } from "../utils/dailyPicker";
+import { buildHintsForQuiz } from "../utils/jottingsHints";
 
 /**
  * Jeeves' Jottings — Daily Quiz (10 Qs)
@@ -9,6 +10,10 @@ import { centralDateStr, pickDailyQuiz, loadPersisted, persistDaily } from "../u
  * - Deterministic daily pick (America/Chicago), max 1 item per origin
  * - Unlimited attempts; immediate per-item feedback after "Check answers"
  * - Persists the day's picked Qs so refresh doesn't reshuffle mid-day
+ *
+ * Hints:
+ * - One hint per question (spoiler-safe), toggled with "Show hints"
+ * - Hints vary by answer and date (deterministic per day)
  *
  * NOTE: answers are evaluated case-insensitively with punctuation/spacing normalization.
  */
@@ -38,6 +43,7 @@ export default function JeevesJottings() {
   const [answers, setAnswers] = useState({});     // id -> string
   const [checked, setChecked] = useState(false);  // show correctness
   const [error, setError] = useState("");
+  const [showHints, setShowHints] = useState(false); // NEW: one hint per question toggle
 
   // Load / pick daily
   useEffect(() => {
@@ -86,9 +92,16 @@ export default function JeevesJottings() {
     return out;
   }, [checked, answers, questions]);
 
+  // Build one hint per question (deterministic per day)
+  const hintsById = useMemo(() => {
+    const arr = buildHintsForQuiz(questions, seed);
+    const map = {};
+    for (const h of arr) map[h.id] = h.hint;
+    return map;
+  }, [questions, seed]);
+
   const total = questions.length;
   const correctCount = Object.values(correctness).filter(Boolean).length;
-
   const allCorrect = checked && total > 0 && correctCount === total;
 
   const onInput = (id, value) => {
@@ -153,6 +166,16 @@ export default function JeevesJottings() {
           <p className="text-sm text-gray-600">Date: {seed} (America/Chicago)</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* NEW: Show/Hide hints toggle */}
+          <button
+            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-amber-100 hover:bg-amber-200 text-amber-900"
+            onClick={() => setShowHints(v => !v)}
+            title="Show one hint per question (spoiler-safe)"
+          >
+            <Lightbulb className="w-4 h-4" />
+            {showHints ? "Hide hints" : "Show hints"}
+          </button>
+
           <button
             className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200"
             onClick={onResetDay}
@@ -170,6 +193,10 @@ export default function JeevesJottings() {
           Type the missing word(s) for each sentence. You can try as many times as you like.
           We’ll only clear the ones you miss when you click <b>Try again</b>. No two questions in today’s set
           are variants of the same base prompt—so each one is unique for the day.
+          {` `}
+          <span className="inline-flex items-center gap-1">
+            Need a nudge? Click <b>Show hints</b> to reveal one spoiler-safe hint per question.
+          </span>
         </div>
       </div>
 
@@ -182,6 +209,7 @@ export default function JeevesJottings() {
           const labelId = `q-${idx}`;
           // split the blank for nicer emphasis (optional)
           const parts = q.question.split("_____");
+          const hint = hintsById[q.id];
 
           return (
             <motion.div
@@ -203,6 +231,14 @@ export default function JeevesJottings() {
                   </React.Fragment>
                 ))}
               </div>
+
+              {/* Hint (spoiler-safe) */}
+              {showHints && (
+                <div className="mb-3 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 inline-flex items-start gap-2">
+                  <Lightbulb className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <div><span className="font-semibold">Hint:</span> {hint}</div>
+                </div>
+              )}
 
               <label htmlFor={labelId} className="sr-only">Your answer</label>
               <div className="flex items-center gap-2">
