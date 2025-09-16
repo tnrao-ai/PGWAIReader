@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, RefreshCw, CheckCircle2, XCircle, HelpCircle, Eye } from "lucide-react";
+import { Trophy, RefreshCw, CheckCircle2, XCircle, HelpCircle, Eye, Lightbulb } from "lucide-react";
 import { centralDateStr, pickDailyQuiz, loadPersisted, persistDaily } from "../utils/dailyPicker";
 
 /**
@@ -9,6 +9,7 @@ import { centralDateStr, pickDailyQuiz, loadPersisted, persistDaily } from "../u
  * - Deterministic daily pick (America/Chicago), max 1 item per origin
  * - Unlimited attempts; immediate per-item feedback after "Check answers"
  * - Persists the day's picked Qs so refresh doesn't reshuffle mid-day
+ * - NEW: Per-question Hints (cycle up to 3), and a global Reveal Answers
  */
 
 function normalizeAnswer(s = "") {
@@ -29,13 +30,106 @@ function isCorrect(userText, correctArr) {
   return (correctArr || []).some(ans => normalizeAnswer(ans) === u);
 }
 
+/* --------------------------
+   Hint helpers (answer-aware)
+   -------------------------- */
+function splitWordsPreserve(answer) {
+  // Split on spaces; keep apostrophes/hyphens inside words
+  return (answer || "").split(/\s+/g).filter(Boolean);
+}
+
+function wordLengthsStr(answer) {
+  const words = splitWordsPreserve(answer);
+  const lengths = words.map(w => w.replace(/[^A-Za-z0-9']/g, "").length);
+  if (lengths.length === 1) return `${lengths[0]} letters`;
+  return `${lengths.length} words: ${lengths.join(" + ")} letters`;
+}
+
+function silhouettePattern(answer) {
+  // Show first letter of each word; keep punctuation; underscore the rest
+  return splitWordsPreserve(answer)
+    .map(w => {
+      const letters = w.replace(/[^A-Za-z0-9'’-]/g, "");
+      if (!letters) return w;
+      // Keep first alnum char; underscore alnum rest; keep internal apostrophes/hyphens
+      let out = "";
+      let firstKept = false;
+      for (let i = 0; i < w.length; i++) {
+        const ch = w[i];
+        if (/[A-Za-z0-9]/.test(ch)) {
+          if (!firstKept) {
+            out += ch.toUpperCase();
+            firstKept = true;
+          } else {
+            out += "_";
+          }
+        } else if (ch === "'" || ch === "’" || ch === "-" || ch === "–" || ch === "—") {
+          out += ch;
+        } else {
+          // (Shouldn’t occur inside a “word”, but just in case)
+          out += ch;
+        }
+      }
+      return out;
+    })
+    .join(" ");
+}
+
+function startsEndsHint(answer) {
+  const words = splitWordsPreserve(answer).filter(w => /[A-Za-z0-9]/.test(w));
+  if (words.length === 0) return null;
+  const firstWord = words[0].replace(/[^A-Za-z0-9]/g, "");
+  const lastWord = words[words.length - 1].replace(/[^A-Za-z0-9]/g, "");
+  const start = firstWord ? firstWord[0].toUpperCase() : null;
+  const end = lastWord ? lastWord[lastWord.length - 1].toUpperCase() : null;
+  if (start && end) return `Starts with “${start}”, ends with “${end}”.`;
+  if (start) return `Starts with “${start}”.`;
+  if (end) return `Ends with “${end}”.`;
+  return null;
+}
+
+function lettersPaletteHint(answer) {
+  // Reveal a small set of distinct letters present in the answer (without order)
+  const set = new Set(answer.toUpperCase().replace(/[^A-Z]/g, "").split(""));
+  const letters = Array.from(set);
+  if (letters.length <= 2) return null;
+  // Select up to 5 letters (without giving away all)
+  const pick = letters.slice(0, Math.min(5, letters.length)).join(" • ");
+  return `Contains letters: ${pick}`;
+}
+
+function buildHintList(primaryAnswer) {
+  const a = primaryAnswer || "";
+  const hints = [];
+
+  // 1) Silhouette pattern (reveals first letters + shape)
+  const pat = silhouettePattern(a);
+  if (pat && pat !== a) hints.push({ kind: "pattern", text: `Shape: ${pat}` });
+
+  // 2) Word lengths
+  const len = wordLengthsStr(a);
+  if (len) hints.push({ kind: "length", text: `Length: ${len}` });
+
+  // 3) Starts/Ends letters
+  const se = startsEndsHint(a);
+  if (se) hints.push({ kind: "edge", text: se });
+
+  // 4) Letter palette (subset)
+  const pal = lettersPaletteHint(a);
+  if (pal) hints.push({ kind: "letters", text: pal });
+
+  // Keep at most 3 to avoid overload
+  return hints.slice(0, 3);
+}
+
 export default function JeevesJottings() {
   const [seed] = useState(centralDateStr());
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]); // picked 10 for the day
   const [answers, setAnswers] = useState({});     // id -> string
   const [checked, setChecked] = useState(false);  // show correctness
-  const [showAll, setShowAll] = useState(false);  // NEW: reveal all answers
+  const [showAll, setShowAll] = useState(false);  // reveal all answers (global)
+  const [hintState, setHintState] = useState({}); // id -> { index, hints[] }
   const [error, setError] = useState("");
 
   // Load / pick daily
@@ -45,6 +139,7 @@ export default function JeevesJottings() {
       setLoading(true);
       setError("");
 
+      // Use persisted pick if present
       const persisted = loadPersisted(seed);
       if (persisted && Array.isArray(persisted) && persisted.length > 0) {
         if (!cancelled) {
@@ -54,6 +149,7 @@ export default function JeevesJottings() {
         return;
       }
 
+      // Otherwise fetch and pick
       try {
         const base = import.meta.env.BASE_URL || "/";
         const resp = await fetch(`${base}content/games/quiz/questions.json`, { cache: "no-cache" });
@@ -72,6 +168,17 @@ export default function JeevesJottings() {
     })();
     return () => { cancelled = true; };
   }, [seed]);
+
+  // Prepare per-question hint lists when questions change
+  useEffect(() => {
+    if (!questions || questions.length === 0) return;
+    const next = {};
+    for (const q of questions) {
+      const primary = (q.answer && q.answer[0]) || "";
+      next[q.id] = { index: -1, hints: buildHintList(primary) };
+    }
+    setHintState(next);
+  }, [questions]);
 
   // Map of correctness (after check)
   const correctness = useMemo(() => {
@@ -110,7 +217,16 @@ export default function JeevesJottings() {
 
   const onRevealAll = () => {
     setShowAll(true);
-    setChecked(true); // optional: ensures correctness icons show where applicable
+    setChecked(true); // so the green ticks show for already-correct entries
+  };
+
+  const onHintClick = (id) => {
+    setHintState(prev => {
+      const node = prev[id] || { index: -1, hints: [] };
+      if (!node.hints || node.hints.length === 0) return prev;
+      const nextIndex = Math.min(node.index + 1, node.hints.length - 1);
+      return { ...prev, [id]: { ...node, index: nextIndex } };
+    });
   };
 
   // Skeleton / Loading
@@ -166,8 +282,8 @@ export default function JeevesJottings() {
       <div className="mb-6 p-3 sm:p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-3">
         <HelpCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
         <div className="text-sm leading-relaxed">
-          Type the missing word(s) for each sentence. You can try as many times as you like.
-          Click <b>Reveal answers</b> if you want to see every correct answer immediately.
+          Type the missing word(s) for each sentence. Click <b>Hint</b> to get a gentle nudge (up to 3 per question),
+          or <b>Reveal answers</b> to show everything at once.
         </div>
       </div>
 
@@ -180,6 +296,10 @@ export default function JeevesJottings() {
           const labelId = `q-${idx}`;
           const parts = q.question.split("_____");
 
+          const hs = hintState[q.id] || { index: -1, hints: [] };
+          const activeHint = hs.index >= 0 ? hs.hints[hs.index] : null;
+          const moreHintsAvailable = hs.hints && hs.index < hs.hints.length - 1;
+
           return (
             <motion.div
               key={q.id}
@@ -187,7 +307,19 @@ export default function JeevesJottings() {
               animate={{ opacity: 1, y: 0 }}
               className={`rounded-lg border p-4 ${isOk ? "border-emerald-300 bg-emerald-50" : isWrong ? "border-rose-300 bg-rose-50" : "border-gray-200 bg-white"}`}
             >
-              <div className="text-sm text-gray-500 mb-1">Q{idx + 1}</div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-sm text-gray-500">Q{idx + 1}</div>
+                <button
+                  onClick={() => onHintClick(q.id)}
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-sm 
+                    ${hs.hints?.length ? "bg-amber-100 hover:bg-amber-200 text-amber-900" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+                  title={hs.hints?.length ? (activeHint ? (moreHintsAvailable ? "Show another hint" : "No more hints") : "Show first hint") : "No hint available"}
+                  disabled={!hs.hints || hs.hints.length === 0}
+                >
+                  <Lightbulb className="w-4 h-4" />
+                  {activeHint ? (moreHintsAvailable ? "Hint +" : "Hint ✓") : "Hint"}
+                </button>
+              </div>
 
               {/* Sentence with blank */}
               <div className="text-[15px] sm:text-base leading-relaxed mb-3">
@@ -200,6 +332,14 @@ export default function JeevesJottings() {
                   </React.Fragment>
                 ))}
               </div>
+
+              {/* Active hint (if any) */}
+              {activeHint && (
+                <div className="mb-2 text-sm rounded-md px-2 py-1 bg-amber-50 border border-amber-200 text-amber-900">
+                  <span className="font-semibold mr-1">Hint:</span>
+                  <span>{activeHint.text}</span>
+                </div>
+              )}
 
               <label htmlFor={labelId} className="sr-only">Your answer</label>
               <div className="flex items-center gap-2">
