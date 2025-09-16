@@ -1,31 +1,56 @@
 // netlify/functions/fetchBook.js
 import fetch from 'node-fetch';
-import { JSDOM } from 'jsdom';
-import createDOMPurify from 'dompurify';
 
 const START_RE = /^\s*[*]{3}\s*START OF (THIS|THE) PROJECT GUTENBERG EBOOK[\s\S]*?[*]{3}\s*$/mi;
 const END_RE   = /^\s*[*]{3}\s*END OF (THIS|THE) PROJECT GUTENBERG EBOOK[\s\S]*?[*]{3}\s*$/mi;
 
-function stripBoilerplate(raw) {
-  const lines = raw.split('\n');
-  const startIdx = lines.findIndex(l => START_RE.test(l));
-  const endIdx   = lines.findIndex(l => END_RE.test(l));
-  const body = (startIdx >= 0 && endIdx > startIdx)
-    ? lines.slice(startIdx + 1, endIdx).join('\n')
-    : raw;
-  return body.trim();
+function sliceBetweenMarkers(str) {
+  const start = str.search(START_RE);
+  const end = str.search(END_RE);
+  if (start !== -1 && end !== -1 && end > start) {
+    const afterStart = str.slice(start);
+    const firstLineLen = (afterStart.match(/^[^\n]*\n/) || [''])[0].length;
+    return str.slice(start + firstLineLen, end).trim();
+  }
+  return str.trim();
 }
 
-// Series-aware chapterization
-function chapterizeText(title, body) {
-  // 1) Chapter I / Chapter 1 etc.
+function stripTagsKeepText(html) {
+  // remove scripts/styles entirely
+  let s = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+  // replace common breaks with newlines for readability
+  s = s.replace(/<(?:br|BR)\s*\/?>/g, '\n')
+       .replace(/<\/p>/gi, '\n\n')
+       .replace(/<\/h[1-6]>/gi, '\n\n');
+
+  // drop all tags
+  s = s.replace(/<[^>]+>/g, '');
+
+  // minimal entity decode for common ones
+  const map = {
+    '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>',
+    '&quot;': '"', '&#39;': "'", '&rsquo;': '’', '&lsquo;': '‘',
+    '&rdquo;': '”', '&ldquo;': '“', '&hellip;': '…', '&mdash;': '—', '&ndash;': '–'
+  };
+  s = s.replace(/&(nbsp|amp|lt|gt|quot|#39|rsquo|lsquo|rdquo|ldquo|hellip|mdash|ndash);/g,
+                m => map[m] || m);
+
+  // collapse excessive blank lines
+  s = s.replace(/\n{3,}/g, '\n\n');
+
+  return s.trim();
+}
+
+function chapterizeFromText(title, body) {
+  // 1) "CHAPTER I"/"Chapter 1" patterns
   const parts1 = body.split(/\n\s*(?:CHAPTER\s+(?:[IVXLCDM]+|\d+)|Chapter\s+\d+)\s*\n/);
   if (parts1.length > 1) {
     return parts1.map((p, i) => ({ title: `Chapter ${i || 1}`, content: p.trim() }))
                  .filter(c => c.content);
   }
 
-  // 2) Short stories in all caps lines
+  // 2) Short-story style (ALL CAPS headings)
   const storySplit = body.split(/\n{1,3}([A-Z][A-Z '\-:.0-9]{4,})\n{1,3}/);
   if (storySplit.length > 1) {
     const chapters = [];
@@ -37,7 +62,7 @@ function chapterizeText(title, body) {
     if (chapters.length) return chapters;
   }
 
-  // 3) Fallback: chunk paragraphs
+  // 3) Fallback: chunk by paragraphs
   const paras = body.split(/\n{2,}/);
   const chunkSize = 60;
   const chapters = [];
@@ -46,18 +71,6 @@ function chapterizeText(title, body) {
     if (slice) chapters.push({ title: `Part ${1 + (i / chunkSize|0)}`, content: slice });
   }
   return chapters;
-}
-
-function chapterizeHTML(title, cleanHTML) {
-  const parts = cleanHTML.split(/<h[23][^>]*>/i);
-  if (parts.length > 1) {
-    return parts.map((p, i) => {
-      const content = (i ? '<h2>' : '') + p;
-      return { title: `Chapter ${i || 1}`, content };
-    }).filter(c => c.content && c.content.replace(/<[^>]+>/g,'').trim());
-  }
-  const one = cleanHTML.trim();
-  return one ? [{ title: 'Text', content: one }] : [];
 }
 
 function isHtmlMime(mime) {
@@ -78,19 +91,17 @@ export const handler = async (event) => {
     const textAlt = `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`;
     const htmlUrl = `https://www.gutenberg.org/cache/epub/${id}/pg${id}-images.html`;
 
-    // Prefer text first (fast, stable); fallback to HTML; then alternate text
     const tryFetch = async (u) => fetch(u, { headers: { 'User-Agent': 'PGWAIReader (Netlify Function)' } });
 
+    // Prefer text → HTML → alternate text
     let url = prefer === 'html' ? htmlUrl : textUtf;
     let res = await tryFetch(url);
 
     if (!res.ok && prefer !== 'html') {
-      // Try HTML if utf-8 text missing
       url = htmlUrl;
       res = await tryFetch(url);
     }
-    if (!res.ok && prefer !== 'txt') {
-      // Last resort: cache/epub text
+    if (!res.ok) {
       url = textAlt;
       res = await tryFetch(url);
     }
@@ -102,26 +113,36 @@ export const handler = async (event) => {
 
     if (isHtmlMime(mime)) {
       const html = await res.text();
-      const startMatch = html.match(START_RE);
-      const endMatch = html.match(END_RE);
-      let slice = html;
-      if (startMatch && endMatch) {
-        slice = html.slice(startMatch.index + startMatch[0].length, endMatch.index);
-      }
-      const dom = new JSDOM(slice);
-      const DOMPurify = createDOMPurify(dom.window);
-      const clean = DOMPurify.sanitize(dom.window.document.body.innerHTML || '');
-      chapters = chapterizeHTML(title, clean);
-      const textOnly = clean.replace(/<[^>]+>/g, ' ');
-      wordCount = textOnly.split(/\s+/).filter(Boolean).length;
+      const sliced = sliceBetweenMarkers(html);
+      // split on headings first
+      const rawParts = sliced.split(/<h[23][^>]*>/i);
+      const parts = rawParts.length > 1 ? rawParts : [sliced];
+
+      const chapterTexts = parts.map((frag, i) => {
+        // if we split on headings, put back a marker so the first line becomes the chapter title after stripping
+        const withHeader = i === 0 ? frag : `<h2>Chapter ${i}</h2>${frag}`;
+        return stripTagsKeepText(withHeader);
+      }).filter(Boolean);
+
+      chapters = chapterTexts.map((t, i) => {
+        // Title: first non-empty line, else "Chapter N"
+        const firstLine = (t.split(/\n+/).find(x => x.trim()) || '').trim();
+        const content = t.trim();
+        const chTitle = firstLine && firstLine.length <= 120 ? firstLine : `Chapter ${i || 1}`;
+        return { title: chTitle, content };
+      }).filter(c => c.content);
+
+      const fullText = chapters.map(c => c.content).join('\n\n');
+      wordCount = fullText.split(/\s+/).filter(Boolean).length;
     } else {
       const raw = await res.text();
-      const body = stripBoilerplate(raw);
-      chapters = chapterizeText(title, body);
-      wordCount = body.split(/\s+/).filter(Boolean).length;
+      const body = sliceBetweenMarkers(raw);
+      chapters = chapterizeFromText(title, body);
+      const fullText = body;
+      wordCount = fullText.split(/\s+/).filter(Boolean).length;
     }
 
-    // Final prune in case upstream produced empties
+    // Final prune
     chapters = (chapters || []).filter(c =>
       c && typeof c.content === 'string' && c.content.trim()
     );
@@ -141,6 +162,6 @@ export const handler = async (event) => {
       body: JSON.stringify({ id, title, wordCount, chapters, license })
     };
   } catch (e) {
-    return { statusCode: 500, body: String(e) };
+    return { statusCode: 502, body: JSON.stringify({ error: String(e) }) };
   }
 };
