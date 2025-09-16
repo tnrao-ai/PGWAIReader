@@ -1,5 +1,11 @@
 # --- Netlify config for PGWAIReader ---
 
+# Build (explicit; works great with Vite)
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
@@ -8,9 +14,14 @@
     "public/content/games/wordweb/words.txt"
   ]
 
-# Route every /api/* request to the corresponding Netlify Function
-# /api/define      -> /.netlify/functions/define
-# /api/summarize   -> /.netlify/functions/summarize
+# -----------------------------
+# API routes -> Netlify Functions
+# Examples:
+#   /api/define       -> /.netlify/functions/define
+#   /api/summarize    -> /.netlify/functions/summarize
+#   /api/fetchBook    -> /.netlify/functions/fetchBook
+#   /api/searchIndex  -> /.netlify/functions/searchIndex
+# -----------------------------
 [[redirects]]
   from = "/api/*"
   to   = "/.netlify/functions/:splat"
@@ -19,6 +30,7 @@
 
 # -----------------------------
 # SPA fallback (client-side routing)
+# Keep LAST so it doesn't swallow the /api/* redirect
 # -----------------------------
 [[redirects]]
   from = "/*"
@@ -26,8 +38,14 @@
   status = 200
 
 # -----------------------------
-# Headers to avoid stale caches
+# Caching headers
 # -----------------------------
+
+# Covers list for the library page; safe to cache for a day and immutable until next deploy/script run.
+[[headers]]
+  for = "/content/library.json"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, immutable"
 
 # Make sure Word Web assets (if you ever serve static JSON there) are always fresh.
 [[headers]]
@@ -41,9 +59,16 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
+# Optional: basic security headers for all static assets
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
 # -----------------------------
 # Local dev (optional but handy)
-# Adjust if you use a different dev server.
 # -----------------------------
 [dev]
   framework = "vite"   # change/remove if not using Vite

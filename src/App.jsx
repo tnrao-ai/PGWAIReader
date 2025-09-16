@@ -108,7 +108,7 @@ const LegalDisclaimer = ({ open, onToggle }) => {
               </p>
               <p>
                 We extend our sincere gratitude and give full credit to <strong>Project Gutenberg</strong> (<a className="underline" href="https://www.gutenberg.org" target="_blank" rel="noreferrer">www.gutenberg.org</a>)
-                for their invaluable efforts in digitizing and making these works freely available online for public access. Project Gutenberg is recognized as a significant resource for providing open access to content of value.
+                for their invaluable efforts in digitizing and making these works freely available online for public access.
               </p>
 
               <h3 className="mt-4 mb-2 text-base md:text-lg font-semibold">Commitment to Open Standards</h3>
@@ -130,25 +130,57 @@ const LegalDisclaimer = ({ open, onToggle }) => {
 };
 
 /* ----------------------
-   Library View (includes Legal Disclaimer + toggle)
+   NEW: License Modal (inline to avoid extra files)
+   ---------------------- */
+const LicenseModal = ({ open, onClose, license }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-xl max-w-2xl w-full p-6" onClick={(e)=>e.stopPropagation()}>
+        <h2 className="text-xl font-semibold mb-3">About &amp; License</h2>
+        <p className="text-sm opacity-80 mb-4">
+          {license?.sentence || 'Project Gutenberg eBook license applies.'}
+        </p>
+        <div className="flex gap-4">
+          {license?.termsUrl && (
+            <a className="underline" href={license.termsUrl} target="_blank" rel="noreferrer">Full License</a>
+          )}
+          {license?.landing && (
+            <a className="underline" href={license.landing} target="_blank" rel="noreferrer">Book Landing Page</a>
+          )}
+        </div>
+        <button className="mt-6 px-4 py-2 rounded-xl bg-neutral-800 text-white" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ----------------------
+   Library View (COVER-ONLY grid + Legal Disclaimer)
    ---------------------- */
 const LibraryView = ({ library, onSelectBook, disclaimerOpen, onToggleDisclaimer }) => (
   <div className="container mx-auto p-4">
     <LegalDisclaimer open={disclaimerOpen} onToggle={onToggleDisclaimer} />
 
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+    {/* Cover-only grid */}
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
       {library.map(book => (
-        <div
-          key={book.id}
+        <button
+          key={book.__uiKey || book.id || book.gutenbergId}
           onClick={() => onSelectBook(book)}
-          className="cursor-pointer group bg-white rounded-lg shadow hover:shadow-lg overflow-hidden transition-transform duration-150 hover:scale-[1.01]"
+          className="group bg-white rounded-lg shadow hover:shadow-lg overflow-hidden transition-transform duration-150 hover:scale-[1.01]"
+          aria-label={book.title || 'Open book'}
         >
-          <img src={book.coverImage} alt={`Cover of ${book.title}`} className="w-full h-48 object-cover" />
-          <div className="p-3">
-            <h3 className="font-bold text-sm md:text-base">{book.title}</h3>
-            <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">{book.author}</p>
-          </div>
-        </div>
+          <img
+            src={book.coverImage || book.coverUrl}
+            alt={book.title ? `Cover of ${book.title}` : 'Book cover'}
+            className="w-full aspect-[3/4] object-cover"
+            loading="lazy"
+          />
+          {/* intentionally no title/author in the card */}
+        </button>
       ))}
     </div>
   </div>
@@ -211,8 +243,9 @@ const DictionaryModal = ({ isOpen, word, loading, error, entries, onClose }) => 
 
 /* ----------------------
    Reading View (pagination + dictionary + mobile long-press)
+   + License button (new) for PG compliance
    ---------------------- */
-const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack, onAiSummary }) => {
+const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack, onAiSummary, license }) => {
   if (!book || !Array.isArray(book.chapters) || book.chapters.length === 0) {
     return (
       <div className="p-6">
@@ -241,6 +274,9 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
   const [dictError, setDictError] = useState('');
   const [dictEntries, setDictEntries] = useState(null);
   const [isDictOpen, setIsDictOpen] = useState(false);
+
+  // License modal
+  const [showLicense, setShowLicense] = useState(false);
 
   // Offline state
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -615,7 +651,14 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
             <h2 className="text-2xl font-bold font-serif">{book.title}</h2>
             <h3 className="text-lg text-gray-600 dark:text-gray-400">{chapter.title}</h3>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={()=>setShowLicense(true)}
+              className="px-3 py-2 rounded-lg border bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
+              title="About & License"
+            >
+              License
+            </button>
             <button onClick={goToPreviousChapter} disabled={currentChapterIndex === 0} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded disabled:opacity-50">Prev Chapter</button>
             <span className="flex-shrink-0">Chapter {currentChapterIndex + 1} of {book.chapters.length}</span>
             <button onClick={goToNextChapter} disabled={currentChapterIndex === book.chapters.length - 1} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded disabled:opacity-50">Next Chapter</button>
@@ -684,6 +727,9 @@ const ReadingView = ({ book, currentChapterIndex, setCurrentChapterIndex, onBack
         entries={dictEntries}
         onClose={closeDictionary}
       />
+
+      {/* License modal */}
+      <LicenseModal open={showLicense} onClose={()=>setShowLicense(false)} license={license} />
     </div>
   );
 };
@@ -746,6 +792,7 @@ export default function App() {
   const [library, setLibrary] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
   const [bookContent, setBookContent] = useState(null);
+  const [bookLicense, setBookLicense] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBookLoading, setIsBookLoading] = useState(false);
   const [bookError, setBookError] = useState(null);
@@ -787,7 +834,25 @@ export default function App() {
         const resp = await fetch(url, { cache: 'no-cache' });
         if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
         const data = await resp.json();
-        setLibrary(data);
+
+        // Back-compat mapper:
+        // Accept either old schema ({id,title,author,coverImage,contentFile})
+        // or new PG schema ({id,gutenbergId,title,author,coverUrl,textUrl,htmlUrl,landing,series})
+        const normalized = (data || []).map((b, i) => ({
+          __uiKey: `${b.id || b.gutenbergId || i}`,
+          id: b.id || (b.gutenbergId ? `pg-${b.gutenbergId}` : `b-${i}`),
+          title: b.title,
+          author: b.author || 'P. G. Wodehouse',
+          coverImage: b.coverImage || b.coverUrl,
+          contentFile: b.contentFile || null,
+          gutenbergId: b.gutenbergId || null,
+          textUrl: b.textUrl || null,
+          htmlUrl: b.htmlUrl || null,
+          landing: b.landing || null,
+          series: b.series || null
+        }));
+
+        setLibrary(normalized);
       } catch (err) {
         console.error("Failed to load library:", err);
       } finally {
@@ -797,47 +862,76 @@ export default function App() {
     load();
   }, []);
 
-  // book loader
+  // Decide how to load a selected book:
+  // 1) Old path: contentFile JSON in /public/content (works exactly as before)
+  // 2) New path: Gutenberg ID present -> call Netlify function to fetch & sanitize
   const handleSelectBook = async (book) => {
     setSelectedBook(book);
     setBookContent(null);
+    setBookLicense(null);
     setBookError(null);
     setIsBookLoading(true);
+    setCurrentChapterIndex(0);
 
-    const raw = (book?.contentFile || '').toString();
-    let urlString = '';
+    const isLegacyJson = !!book.contentFile;
+    const hasPG = !!book.gutenbergId;
+
     try {
-      const basePath = import.meta.env.BASE_URL ?? '/';
-      const origin = (typeof location !== 'undefined' && location?.origin) ? location.origin : (typeof window !== 'undefined' ? window.location.origin : '');
-      let path = raw.trim();
+      if (isLegacyJson) {
+        // Legacy JSON file behavior (unchanged)
+        const basePath = import.meta.env.BASE_URL ?? '/';
+        const origin = (typeof location !== 'undefined' && location?.origin) ? location.origin : (typeof window !== 'undefined' ? window.location.origin : '');
+        let path = String(book.contentFile).trim();
+        let urlString = '';
 
-      if (/^https?:\/\//i.test(path)) {
-        urlString = path;
+        if (/^https?:\/\//i.test(path)) {
+          urlString = path;
+        } else {
+          path = path.replace(/^\/+/, '');
+          if (!path.startsWith('content/')) path = `content/${path}`;
+          const normalizedBase = basePath.endsWith('/') ? basePath : basePath + '/';
+          const baseForURL = origin + normalizedBase;
+          urlString = new URL(path, baseForURL).toString();
+        }
+
+        const response = await fetch(urlString, { cache: 'no-cache' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+        if (!contentType.includes('application/json')) {
+          const text = await response.text();
+          throw new Error(`Expected JSON but got ${contentType || 'unknown'}: ${text.slice(0, 200)}`);
+        }
+        const data = await response.json();
+        if (!data || !Array.isArray(data.chapters)) {
+          throw new Error('Book JSON has unexpected format (missing chapters array).');
+        }
+
+        // Normalize minimal fields ReadingView expects
+        setBookContent({ title: book.title, chapters: data.chapters });
+        setBookLicense(null);
+      } else if (hasPG) {
+        // New PG path via Netlify function
+        const resp = await fetch(`/.netlify/functions/fetchBook?id=${encodeURIComponent(book.gutenbergId)}&title=${encodeURIComponent(book.title || '')}`, {
+          headers: { 'Accept': 'application/json' },
+          cache: 'no-cache'
+        });
+        const txt = await resp.text();
+        let json = null;
+        try { json = txt ? JSON.parse(txt) : null; }
+        catch (e) { throw new Error(`Malformed JSON from fetchBook. ${e?.message || 'Parse error.'}`); }
+
+        if (!resp.ok) {
+          throw new Error(`fetchBook failed (${resp.status}). ${txt?.slice(0, 240) || 'No body.'}`);
+        }
+        if (!json || !Array.isArray(json.chapters)) {
+          throw new Error('fetchBook: missing chapters array.');
+        }
+
+        setBookContent({ title: book.title || json.title || 'Untitled', chapters: json.chapters });
+        setBookLicense(json.license || null);
       } else {
-        path = path.replace(/^\/+/, '');
-        if (!path.startsWith('content/')) path = `content/${path}`;
-        const normalizedBase = basePath.endsWith('/') ? basePath : basePath + '/';
-        const baseForURL = origin + normalizedBase;
-        urlString = new URL(path, baseForURL).toString();
+        throw new Error('Selected book is missing both contentFile and gutenbergId.');
       }
-    } catch {
-      urlString = `/content/${encodeURIComponent(raw.replace(/^\/+/, ''))}`;
-    }
-
-    try {
-      const response = await fetch(urlString, { cache: 'no-cache' });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
-      const contentType = (response.headers.get('content-type') || '').toLowerCase();
-      if (!contentType.includes('application/json')) {
-        const text = await response.text();
-        throw new Error(`Expected JSON but got ${contentType || 'unknown'}: ${text.slice(0, 200)}`);
-      }
-      const data = await response.json();
-      if (!data || !Array.isArray(data.chapters)) {
-        throw new Error('Book JSON has unexpected format (missing chapters array).');
-      }
-      setBookContent(data);
-      setCurrentChapterIndex(0);
     } catch (error) {
       setBookError(error?.message || 'Failed to load book content');
       setBookContent(null);
@@ -849,6 +943,7 @@ export default function App() {
   const handleBackToLibrary = () => {
     setSelectedBook(null);
     setBookContent(null);
+    setBookLicense(null);
     setBookError(null);
     setCurrentChapterIndex(0);
   };
@@ -914,6 +1009,7 @@ export default function App() {
           setCurrentChapterIndex={setCurrentChapterIndex}
           onBack={handleBackToLibrary}
           onAiSummary={handleAiSummary}
+          license={bookLicense}
         />
       );
     }
