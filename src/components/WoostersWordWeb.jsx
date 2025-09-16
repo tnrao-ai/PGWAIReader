@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { HelpCircle, RefreshCw, Lightbulb, X, Sparkles } from "lucide-react";
+import { HelpCircle, RefreshCw, Lightbulb, X, Sparkles, Eye } from "lucide-react";
 
 /* ========= Date utils (America/Chicago) ========= */
 function centralDateStr(d = new Date()) {
@@ -18,28 +18,16 @@ function centralDateStr(d = new Date()) {
 const DEFAULT_PUZZLE = {
   theme: "Wodehouse Sampler",
   size: 12,
-  // Words placed as single continuous paths, with no overlapping letters.
-  // Rows 0..11, Cols 0..11
   grid: [
-    // 0: WOOSTER at (0,0)→(6,0)
     "WOOSTERWEZX",
-    // 1: filler
     "QHMVLPYDKRU",
-    // 2: JEEVES at (2,2)→(7,2)
     "ABJEEVESCNO",
-    // 3: filler
     "TRGQXNAHFIU",
-    // 4: BLANDINGS at (0,4)→(8,4)
     "BLANDINGSQZ",
-    // 5: filler
     "PCWYROTZMEL",
-    // 6: WHISKY at (5,6)→(10,6)
     "UVQRTWHISKY",
-    // 7: filler
     "ONCABGDLPEX",
-    // 8: AGATHA at (2,8)→(7,8)
     "JJAGATHAVBS",
-    // 9..11: filler
     "MZQIRUTEOPC",
     "LXFDBNCGTHA",
     "SRVYEWKJIMQ",
@@ -47,14 +35,13 @@ const DEFAULT_PUZZLE = {
   answers: ["WOOSTER", "JEEVES", "BLANDINGS", "WHISKY", "AGATHA"],
 };
 
-/* ========= Validation + normalization + gentle repair ========= */
+/* ========= Validation + normalization ========= */
 const isArray = (x) => Array.isArray(x);
 const isString = (x) => typeof x === "string";
 const normalizeRow = (row) => String(row || "").toUpperCase().replace(/[^A-Z]/g, "");
 const normalizeAns = (a) => String(a || "").toUpperCase().replace(/[^A-Z]/g, "");
 
 function validateAndRepair(json) {
-  const notes = [];
   if (!json || typeof json !== "object") {
     return { ok: false, reason: "Puzzle JSON is not an object." };
   }
@@ -71,13 +58,12 @@ function validateAndRepair(json) {
 
   const rand = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));
 
-  // Exactly N rows
-  if (grid.length !== N) { /* internal note only; no UI print */ }
+  // Exactly N rows (silent adjustments)
   grid = [...grid];
   while (grid.length < N) grid.push("");
   if (grid.length > N) grid = grid.slice(0, N);
 
-  // Each row length == N
+  // Each row length == N (silent pad/trim)
   grid = grid.map((r) => {
     let rr = r;
     if (rr.length < N) {
@@ -93,7 +79,7 @@ function validateAndRepair(json) {
     return { ok: false, reason: "No answers provided." };
   }
 
-  return { ok: true, value: { theme, size: N, grid, answers, notes } };
+  return { ok: true, value: { theme, size: N, grid, answers } };
 }
 
 /* ========= Selection mechanics ========= */
@@ -145,7 +131,7 @@ function HowModal({ open, onClose }) {
           <li><b>Find the themed entries</b> hidden in the letter grid. Paths can go horizontally, vertically, diagonally, and may <b>bend</b>. Reverse is allowed.</li>
           <li><b>Drag to select</b> letters (mouse or touch). You can <b>backtrack</b>: sliding back over the previous tile removes it.</li>
           <li>Release to submit; if your path matches an answer (forwards or backwards), it is marked as found and stays highlighted.</li>
-          <li>Stuck? Use <b>Hint</b>. You also get <b>one “Reveal start”</b> per day that highlights a valid first letter for an unsolved word.</li>
+          <li>Use <b>Hint</b> for a tiny nudge (it briefly marks a plausible starting cell). <b>Reveal start</b> (once/day) shows a guaranteed valid starting cell. <b>Reveal solution</b> shows the full solved grid.</li>
           <li><b>Reset</b> clears today’s progress. New puzzle each day (America/Chicago).</li>
         </ol>
       </div>
@@ -159,7 +145,6 @@ export default function WoostersWordWeb() {
   const [loading, setLoading] = useState(true);
   const [puzzle, setPuzzle] = useState(null);
   const [error, setError] = useState("");
-  const [repairNotes, setRepairNotes] = useState([]); // kept for state hygiene; not rendered
 
   // live selection path
   const [path, setPath] = useState([]); // [{x,y}]
@@ -182,7 +167,7 @@ export default function WoostersWordWeb() {
 
   const N = puzzle?.size || 0;
 
-  /* ----- load daily w/ fallbacks + rehydrate persistence ----- */
+  /* ----- load daily + persistence ----- */
   useEffect(() => {
     let cancelled = false;
 
@@ -207,17 +192,15 @@ export default function WoostersWordWeb() {
     (async () => {
       setLoading(true);
       setError("");
-      setRepairNotes([]);
       setHintCell(null);
 
-      // restore persistence
       const persisted = loadFound(seed);
       setRevealsUsed(persisted.reveals);
 
-      // 1) Try Netlify function first (live generation)
+      // 1) Netlify Function (live generation)
       let raw = await fetchJSON(`/.netlify/functions/wordweb?date=${seed}`);
 
-      // 2) Fallback to static files if function not available
+      // 2) Static fallback
       if (!raw) {
         const base = import.meta.env.BASE_URL || "/";
         const dayUrl = `${base}content/games/wordweb/daily/${seed}.json?v=${seed}`;
@@ -231,12 +214,10 @@ export default function WoostersWordWeb() {
         setError(v.reason);
         const safe = validateAndRepair(DEFAULT_PUZZLE).value;
         setPuzzle(safe);
-        // rehydrate found restricted to safe answers
         setFound(new Set((persisted.found || []).filter(a => safe.answers.includes(a))));
         setFoundPaths(filterFoundPaths(persisted.foundPaths || {}, safe.answers));
       } else {
         setPuzzle(v.value);
-        if (v.value.notes?.length) setRepairNotes(v.value.notes); // kept, not rendered
         setFound(new Set((persisted.found || []).filter(a => v.value.answers.includes(a))));
         setFoundPaths(filterFoundPaths(persisted.foundPaths || {}, v.value.answers));
       }
@@ -260,7 +241,6 @@ export default function WoostersWordWeb() {
     const to = setTimeout(() => setLastMoveTs(Date.now()), HINT_IDLE_MS);
     return () => clearTimeout(to);
   }, [lastMoveTs, puzzle, found]);
-
   const themePulseKey = useMemo(() => lastMoveTs, [lastMoveTs]);
 
   /* ----- responsive cell size ----- */
@@ -304,14 +284,11 @@ export default function WoostersWordWeb() {
       const b = prev[prev.length - 1];
       const c = { x, y };
 
-      // If staying on the same cell, ignore
       if (b.x === c.x && b.y === c.y) return prev;
 
-      // ---- Smart backtrack to ANY earlier node ----
+      // Smart backtrack to ANY earlier node
       const idx = prev.findIndex((p) => p.x === c.x && p.y === c.y);
-      if (idx !== -1) {
-        return prev.slice(0, idx + 1);
-      }
+      if (idx !== -1) return prev.slice(0, idx + 1);
 
       // must be 8-neighbor adjacent from last node b
       const ax = Math.abs(c.x - b.x);
@@ -334,7 +311,7 @@ export default function WoostersWordWeb() {
     });
   };
 
-  // Desktop smoothing: while dragging, also follow the mouse globally over the grid
+  // Desktop smoothing: while dragging, follow the mouse over the grid
   const onGridMouseMove = (e) => {
     if (!isDown) return;
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -364,7 +341,43 @@ export default function WoostersWordWeb() {
     setPath([]);
   };
 
-  /* ----- reveal-first-letter (once/day) ----- */
+  /* ----- Hint: tiny nudge (brief highlight of a plausible start) ----- */
+  const collectHintStarts = () => {
+    if (!puzzle) return [];
+    const remaining = puzzle.answers.filter((a) => !found.has(a));
+    const spots = [];
+    for (const ans of remaining) {
+      const A = ans[0], B = ans[1] || null;
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          if (letters[y][x] !== A) continue;
+          if (!B) { spots.push({ x, y }); continue; }
+          let ok = false;
+          for (let dy = -1; dy <= 1 && !ok; dy++) {
+            for (let dx = -1; dx <= 1 && !ok; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const nx = x + dx, ny = y + dy;
+              if (inBounds(nx, ny, N) && letters[ny][nx] === B) ok = true;
+            }
+          }
+          if (ok) spots.push({ x, y });
+        }
+      }
+    }
+    return spots;
+  };
+  const onHintNudge = () => {
+    setLastMoveTs(Date.now());
+    const spots = collectHintStarts();
+    if (!spots.length) return;
+    const pick = spots[Math.floor(Math.random() * spots.length)];
+    setHintCell(pick);
+    setTimeout(() => {
+      setHintCell((c) => (c && c.x === pick.x && c.y === pick.y ? null : c));
+    }, 1200);
+  };
+
+  /* ----- Reveal-first-letter (once/day) ----- */
   const findRevealStartFor = (answer) => {
     if (!puzzle) return null;
     const A = answer[0], B = answer[1] || null;
@@ -372,7 +385,6 @@ export default function WoostersWordWeb() {
       for (let x = 0; x < N; x++) {
         if (letters[y][x] !== A) continue;
         if (!B) return { x, y };
-        // check neighbors include B
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
             if (dx === 0 && dy === 0) continue;
@@ -397,6 +409,56 @@ export default function WoostersWordWeb() {
       setRevealsUsed((n) => n + 1);
       setLastMoveTs(Date.now());
     }
+  };
+
+  /* ----- Reveal solution: find paths for all answers and mark them found ----- */
+  const DIRS = [
+    { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
+    { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
+    { dx: 1, dy: 1 }, { dx: -1, dy: -1 },
+    { dx: 1, dy: -1 }, { dx: -1, dy: 1 },
+  ];
+
+  const findWordPath = (word) => {
+    // Search straight lines (H, V, D) for word or reversed
+    const targets = [word, word.split("").reverse().join("")];
+    for (const target of targets) {
+      const W = target;
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          if (letters[y][x] !== W[0]) continue;
+          for (const { dx, dy } of DIRS) {
+            const cells = [{ x, y }];
+            let ok = true;
+            for (let i = 1; i < W.length; i++) {
+              const nx = x + dx * i, ny = y + dy * i;
+              if (!inBounds(nx, ny, N)) { ok = false; break; }
+              if (letters[ny][nx] !== W[i]) { ok = false; break; }
+              cells.push({ x: nx, y: ny });
+            }
+            if (ok) return cells;
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const onRevealSolution = () => {
+    if (!puzzle) return;
+    const mergedPaths = { ...foundPaths };
+    const all = new Set(puzzle.answers);
+    for (const ans of puzzle.answers) {
+      if (!mergedPaths[ans]) {
+        const cells = findWordPath(ans);
+        if (cells) mergedPaths[ans] = cells;
+      }
+    }
+    setFound(all);
+    setFoundPaths(mergedPaths);
+    setPath([]);
+    setHintCell(null);
+    setLastMoveTs(Date.now());
   };
 
   /* ----- reset ----- */
@@ -440,21 +502,33 @@ export default function WoostersWordWeb() {
           >
             <RefreshCw className="w-4 h-4" /> Reset
           </button>
+
           <button
-            onClick={() => setLastMoveTs(Date.now())}
+            onClick={onHintNudge}
             className="inline-flex items-center gap-2 px-3 py-2 rounded bg-amber-100 hover:bg-amber-200"
-            title="Hint nudge"
+            title="Show a subtle starting-cell nudge for a remaining word"
           >
             <Lightbulb className="w-4 h-4" /> Hint
           </button>
+
           <button
             onClick={onRevealFirstLetter}
             disabled={revealsUsed >= HINT_REVEAL_LIMIT || (puzzle && found.size === puzzle.answers.length)}
             className={`inline-flex items-center gap-2 px-3 py-2 rounded ${revealsUsed < HINT_REVEAL_LIMIT ? "bg-indigo-100 hover:bg-indigo-200" : "bg-gray-100 opacity-60 cursor-not-allowed"}`}
-            title={revealsUsed < HINT_REVEAL_LIMIT ? "Reveal a valid starting letter (once per day)" : "Reveal used up for today"}
+            title={revealsUsed < HINT_REVEAL_LIMIT ? "Reveal a guaranteed valid starting letter (once per day)" : "Reveal used up for today"}
           >
             <Sparkles className="w-4 h-4" /> Reveal start
           </button>
+
+          <button
+            onClick={onRevealSolution}
+            disabled={allFound}
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded ${allFound ? "bg-gray-100 opacity-60 cursor-not-allowed" : "bg-emerald-100 hover:bg-emerald-200"}`}
+            title="Show full solution (highlight all answers)"
+          >
+            <Eye className="w-4 h-4" /> Reveal solution
+          </button>
+
           <button
             className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200"
             title="How to play"
@@ -465,7 +539,7 @@ export default function WoostersWordWeb() {
         </div>
       </div>
 
-      {/* Error (repair notes removed from UI) */}
+      {/* Error */}
       <AnimatePresence initial={false}>
         {error && (
           <motion.div
