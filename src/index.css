@@ -4,5 +4,57 @@
 
 body {
   transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+  -webkit-tap-highlight-color: transparent; /* nicer taps on iOS/Android */
 }
 
+/* ==========================================================
+   Mobile puzzle stability (prevents page jiggle while dragging)
+   ========================================================== */
+
+/* Wrap the puzzle area in this class (done in Games.jsx) */
+.puzzle-touch-guard {
+  /* Block browser pan/zoom gestures inside the puzzle area */
+  touch-action: none;               /* modern gesture lock */
+  -ms-touch-action: none;           /* legacy Edge */
+
+  /* Stop scroll chaining (no rubber-band bounce into the page) */
+  overscroll-behavior: contain;
+
+  /* Keep taps from selecting text / showing callouts */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+
+  /* Help some WebViews treat this like a “solid” region */
+  position: relative;
+}
+
+/* Optional: keep the puzzle visually bounded and non-scrollable */
+.puzzle-touch-guard-fixed {
+  max-width: 100%;
+  max-height: 75vh;  /* adjust to taste; ensures room for controls */
+  overflow: hidden;
+  border-radius: 0.75rem; /* matches rounded-xl vibe */
+}
+
+/* Buttons/links inside can still be tapped rapidly without double-tap zoom */
+.puzzle-touch-guard button,
+.puzzle-touch-guard a {
+  touch-action: manipulation;
+}
+
+/* (Optional) utility for puzzle grids that rely on pointer events */
+.puzzle-pointer-surface {
+  /* Encourage the browser to treat as interactive hit-area */
+  cursor: pointer;
+  -webkit-user-drag: none;
+}
+
+/* (Optional) subtle selection highlight class you can add to cells */
+.ww-selected {
+  background-color: rgba(59,130,246,0.18); /* Tailwind blue-500 @ ~18% */
+}
+
+.ww-correct {
+  background-color: rgba(16,185,129,0.22); /* emerald-500 @ ~22% */
+}
