@@ -13,7 +13,7 @@ body {
 
 /* Wrap the puzzle area in this class (done in Games.jsx) */
 .puzzle-touch-guard {
-  /* Block browser pan/zoom gestures inside the puzzle area */
+  /* Block browser pan/zoom gestures outside our internal scroller */
   touch-action: none;               /* modern gesture lock */
   -ms-touch-action: none;           /* legacy Edge */
 
@@ -29,10 +29,23 @@ body {
   position: relative;
 }
 
-/* Optional: keep the puzzle visually bounded and non-scrollable */
+/* The inner scroll container that allows two-axis panning for big grids */
+.puzzle-scroller {
+  overflow: auto;
+  /* Allow 2D panning inside the scroller while the outer guard blocks page scroll */
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; /* smooth iOS scrolling */
+  max-width: 100%;
+  max-height: 75vh; /* adjust as desired */
+  background: transparent;
+  border-radius: 0.5rem;
+}
+
+/* Optional: keep the puzzle visually bounded and non-scrollable (legacy variant) */
 .puzzle-touch-guard-fixed {
   max-width: 100%;
-  max-height: 75vh;  /* adjust to taste; ensures room for controls */
+  max-height: 75vh;  /* ensures room for controls */
   overflow: hidden;
   border-radius: 0.75rem; /* matches rounded-xl vibe */
 }
@@ -58,3 +71,44 @@ body {
 .ww-correct {
   background-color: rgba(16,185,129,0.22); /* emerald-500 @ ~22% */
 }
+
+/* ==========================================================
+   Mobile UI compaction (reader/library/toolbars)
+   - Shrinks common button paddings & large headings on small screens
+   - Frees vertical space for reading
+   ========================================================== */
+@media (max-width: 480px) {
+  /* Compact common “button-like” paddings (Tailwind style utilities) */
+  .px-4.py-2 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    padding-top: 0.375rem !important;
+    padding-bottom: 0.375rem !important;
+  }
+
+  /* Slightly reduce oversized headings often used in toolbars */
+  .text-lg { font-size: 1rem !important; }        /* was ~1.125rem */
+  .text-xl { font-size: 1.125rem !important; }    /* was ~1.25rem */
+
+  /* Reader/toolbars: keep controls slimmer */
+  .reader-toolbar button,
+  .reader-toolbar .btn,
+  .library-toolbar button,
+  .library-toolbar .btn {
+    padding: 0.375rem 0.5rem !important;
+    line-height: 1.1;
+  }
+
+  /* Make bottom bars a tad shorter if your layout uses them */
+  .reader-bottombar,
+  .toolbar-compact {
+    padding-top: 0.375rem !important;
+    padding-bottom: 0.375rem !important;
+  }
+}
+
+/* (Optional) visually hidden scrollbars, if you prefer cleaner look on some Android WebViews */
+/*
+.puzzle-scroller::-webkit-scrollbar { width: 0; height: 0; }
+.puzzle-scroller { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*/
