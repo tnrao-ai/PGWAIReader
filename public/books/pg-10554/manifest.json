@@ -1,0 +1,18 @@
+{
+  "id": 10554,
+  "title": "Right Ho, Jeeves",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 73815,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 73815
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/10554"
+  }
+}

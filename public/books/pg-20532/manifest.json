@@ -1,0 +1,18 @@
+{
+  "id": 20532,
+  "title": "Love Among the Chickens: A Story of the Haps and Mishaps on an English Chicken Farm",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 49327,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 49327
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/20532"
+  }
+}

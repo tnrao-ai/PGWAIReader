@@ -1,0 +1,18 @@
+{
+  "id": 6985,
+  "title": "A Prefect's Uncle",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 42274,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 42274
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/6985"
+  }
+}

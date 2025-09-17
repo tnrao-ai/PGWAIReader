@@ -1,0 +1,18 @@
+{
+  "id": 8176,
+  "title": "Death at the Excelsior, and Other Stories",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 37927,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 37927
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/8176"
+  }
+}

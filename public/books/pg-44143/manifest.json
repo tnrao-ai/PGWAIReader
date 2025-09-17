@@ -1,0 +1,108 @@
+{
+  "id": 44143,
+  "title": "Lord Lyons: A Record of British Diplomacy, Vol. 2 of 2",
+  "author": "Newton, Thomas Wodehouse Legh, Baron",
+  "wordCount": 150024,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Chapter 1",
+      "file": "ch-01.json",
+      "words": 66
+    },
+    {
+      "index": 2,
+      "title": "Chapter 1",
+      "file": "ch-02.json",
+      "words": 45
+    },
+    {
+      "index": 3,
+      "title": "Chapter 2",
+      "file": "ch-03.json",
+      "words": 125
+    },
+    {
+      "index": 4,
+      "title": "Chapter 3",
+      "file": "ch-04.json",
+      "words": 77
+    },
+    {
+      "index": 5,
+      "title": "Chapter 4",
+      "file": "ch-05.json",
+      "words": 105
+    },
+    {
+      "index": 6,
+      "title": "Chapter 5",
+      "file": "ch-06.json",
+      "words": 95
+    },
+    {
+      "index": 7,
+      "title": "Chapter 6",
+      "file": "ch-07.json",
+      "words": 103
+    },
+    {
+      "index": 8,
+      "title": "Chapter 7",
+      "file": "ch-08.json",
+      "words": 173
+    },
+    {
+      "index": 9,
+      "title": "Chapter 8",
+      "file": "ch-09.json",
+      "words": 14246
+    },
+    {
+      "index": 10,
+      "title": "Chapter 9",
+      "file": "ch-10.json",
+      "words": 14857
+    },
+    {
+      "index": 11,
+      "title": "Chapter 10",
+      "file": "ch-11.json",
+      "words": 20876
+    },
+    {
+      "index": 12,
+      "title": "Chapter 11",
+      "file": "ch-12.json",
+      "words": 14765
+    },
+    {
+      "index": 13,
+      "title": "Chapter 12",
+      "file": "ch-13.json",
+      "words": 14586
+    },
+    {
+      "index": 14,
+      "title": "Chapter 13",
+      "file": "ch-14.json",
+      "words": 14300
+    },
+    {
+      "index": 15,
+      "title": "Chapter 14",
+      "file": "ch-15.json",
+      "words": 16683
+    },
+    {
+      "index": 16,
+      "title": "Chapter 15",
+      "file": "ch-16.json",
+      "words": 38922
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/44143"
+  }
+}

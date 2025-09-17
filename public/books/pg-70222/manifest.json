@@ -1,0 +1,18 @@
+{
+  "id": 70222,
+  "title": "Meet Mr Mulliner",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 52984,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 52984
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/70222"
+  }
+}

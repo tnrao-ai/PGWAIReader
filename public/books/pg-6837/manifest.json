@@ -1,0 +1,18 @@
+{
+  "id": 6837,
+  "title": "The Little Warrior",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 116706,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 116706
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/6837"
+  }
+}

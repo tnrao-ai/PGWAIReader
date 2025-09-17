@@ -1,0 +1,18 @@
+{
+  "id": 6877,
+  "title": "The Head of Kay's",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 44680,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 44680
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/6877"
+  }
+}

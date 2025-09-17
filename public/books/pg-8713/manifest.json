@@ -1,0 +1,18 @@
+{
+  "id": 8713,
+  "title": "A Man of Means",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 27167,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 27167
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/8713"
+  }
+}

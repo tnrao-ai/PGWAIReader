@@ -1,0 +1,18 @@
+{
+  "id": 6980,
+  "title": "Tales of St. Austin's",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 50533,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 50533
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/6980"
+  }
+}

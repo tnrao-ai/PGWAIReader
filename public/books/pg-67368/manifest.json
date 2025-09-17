@@ -1,0 +1,18 @@
+{
+  "id": 67368,
+  "title": "Sam in the Suburbs",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 79097,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 79097
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/67368"
+  }
+}

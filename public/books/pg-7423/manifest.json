@@ -1,0 +1,372 @@
+{
+  "id": 7423,
+  "title": "Mike",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 106818,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Chapter 1",
+      "file": "ch-01.json",
+      "words": 366
+    },
+    {
+      "index": 2,
+      "title": "Chapter 1",
+      "file": "ch-02.json",
+      "words": 1875
+    },
+    {
+      "index": 3,
+      "title": "Chapter 2",
+      "file": "ch-03.json",
+      "words": 1866
+    },
+    {
+      "index": 4,
+      "title": "Chapter 3",
+      "file": "ch-04.json",
+      "words": 1825
+    },
+    {
+      "index": 5,
+      "title": "Chapter 4",
+      "file": "ch-05.json",
+      "words": 1675
+    },
+    {
+      "index": 6,
+      "title": "Chapter 5",
+      "file": "ch-06.json",
+      "words": 2546
+    },
+    {
+      "index": 7,
+      "title": "Chapter 6",
+      "file": "ch-07.json",
+      "words": 1482
+    },
+    {
+      "index": 8,
+      "title": "Chapter 7",
+      "file": "ch-08.json",
+      "words": 2013
+    },
+    {
+      "index": 9,
+      "title": "Chapter 8",
+      "file": "ch-09.json",
+      "words": 2182
+    },
+    {
+      "index": 10,
+      "title": "Chapter 9",
+      "file": "ch-10.json",
+      "words": 1784
+    },
+    {
+      "index": 11,
+      "title": "Chapter 10",
+      "file": "ch-11.json",
+      "words": 1542
+    },
+    {
+      "index": 12,
+      "title": "Chapter 11",
+      "file": "ch-12.json",
+      "words": 1799
+    },
+    {
+      "index": 13,
+      "title": "Chapter 12",
+      "file": "ch-13.json",
+      "words": 1702
+    },
+    {
+      "index": 14,
+      "title": "Chapter 13",
+      "file": "ch-14.json",
+      "words": 2751
+    },
+    {
+      "index": 15,
+      "title": "Chapter 14",
+      "file": "ch-15.json",
+      "words": 1255
+    },
+    {
+      "index": 16,
+      "title": "Chapter 15",
+      "file": "ch-16.json",
+      "words": 1888
+    },
+    {
+      "index": 17,
+      "title": "Chapter 16",
+      "file": "ch-17.json",
+      "words": 1726
+    },
+    {
+      "index": 18,
+      "title": "Chapter 17",
+      "file": "ch-18.json",
+      "words": 1735
+    },
+    {
+      "index": 19,
+      "title": "Chapter 18",
+      "file": "ch-19.json",
+      "words": 1587
+    },
+    {
+      "index": 20,
+      "title": "Chapter 19",
+      "file": "ch-20.json",
+      "words": 2166
+    },
+    {
+      "index": 21,
+      "title": "Chapter 20",
+      "file": "ch-21.json",
+      "words": 1560
+    },
+    {
+      "index": 22,
+      "title": "Chapter 21",
+      "file": "ch-22.json",
+      "words": 1971
+    },
+    {
+      "index": 23,
+      "title": "Chapter 22",
+      "file": "ch-23.json",
+      "words": 1525
+    },
+    {
+      "index": 24,
+      "title": "Chapter 23",
+      "file": "ch-24.json",
+      "words": 1868
+    },
+    {
+      "index": 25,
+      "title": "Chapter 24",
+      "file": "ch-25.json",
+      "words": 1506
+    },
+    {
+      "index": 26,
+      "title": "Chapter 25",
+      "file": "ch-26.json",
+      "words": 999
+    },
+    {
+      "index": 27,
+      "title": "Chapter 26",
+      "file": "ch-27.json",
+      "words": 1557
+    },
+    {
+      "index": 28,
+      "title": "Chapter 27",
+      "file": "ch-28.json",
+      "words": 1957
+    },
+    {
+      "index": 29,
+      "title": "Chapter 28",
+      "file": "ch-29.json",
+      "words": 3711
+    },
+    {
+      "index": 30,
+      "title": "Chapter 29",
+      "file": "ch-30.json",
+      "words": 876
+    },
+    {
+      "index": 31,
+      "title": "Chapter 30",
+      "file": "ch-31.json",
+      "words": 1847
+    },
+    {
+      "index": 32,
+      "title": "Chapter 31",
+      "file": "ch-32.json",
+      "words": 1392
+    },
+    {
+      "index": 33,
+      "title": "Chapter 32",
+      "file": "ch-33.json",
+      "words": 1385
+    },
+    {
+      "index": 34,
+      "title": "Chapter 33",
+      "file": "ch-34.json",
+      "words": 1878
+    },
+    {
+      "index": 35,
+      "title": "Chapter 34",
+      "file": "ch-35.json",
+      "words": 2103
+    },
+    {
+      "index": 36,
+      "title": "Chapter 35",
+      "file": "ch-36.json",
+      "words": 1770
+    },
+    {
+      "index": 37,
+      "title": "Chapter 36",
+      "file": "ch-37.json",
+      "words": 1843
+    },
+    {
+      "index": 38,
+      "title": "Chapter 37",
+      "file": "ch-38.json",
+      "words": 1869
+    },
+    {
+      "index": 39,
+      "title": "Chapter 38",
+      "file": "ch-39.json",
+      "words": 2092
+    },
+    {
+      "index": 40,
+      "title": "Chapter 39",
+      "file": "ch-40.json",
+      "words": 1372
+    },
+    {
+      "index": 41,
+      "title": "Chapter 40",
+      "file": "ch-41.json",
+      "words": 2893
+    },
+    {
+      "index": 42,
+      "title": "Chapter 41",
+      "file": "ch-42.json",
+      "words": 1586
+    },
+    {
+      "index": 43,
+      "title": "Chapter 42",
+      "file": "ch-43.json",
+      "words": 1237
+    },
+    {
+      "index": 44,
+      "title": "Chapter 43",
+      "file": "ch-44.json",
+      "words": 1528
+    },
+    {
+      "index": 45,
+      "title": "Chapter 44",
+      "file": "ch-45.json",
+      "words": 1675
+    },
+    {
+      "index": 46,
+      "title": "Chapter 45",
+      "file": "ch-46.json",
+      "words": 2218
+    },
+    {
+      "index": 47,
+      "title": "Chapter 46",
+      "file": "ch-47.json",
+      "words": 1091
+    },
+    {
+      "index": 48,
+      "title": "Chapter 47",
+      "file": "ch-48.json",
+      "words": 1732
+    },
+    {
+      "index": 49,
+      "title": "Chapter 48",
+      "file": "ch-49.json",
+      "words": 1966
+    },
+    {
+      "index": 50,
+      "title": "Chapter 49",
+      "file": "ch-50.json",
+      "words": 1936
+    },
+    {
+      "index": 51,
+      "title": "Chapter 50",
+      "file": "ch-51.json",
+      "words": 1732
+    },
+    {
+      "index": 52,
+      "title": "Chapter 51",
+      "file": "ch-52.json",
+      "words": 2059
+    },
+    {
+      "index": 53,
+      "title": "Chapter 52",
+      "file": "ch-53.json",
+      "words": 1041
+    },
+    {
+      "index": 54,
+      "title": "Chapter 53",
+      "file": "ch-54.json",
+      "words": 1843
+    },
+    {
+      "index": 55,
+      "title": "Chapter 54",
+      "file": "ch-55.json",
+      "words": 1438
+    },
+    {
+      "index": 56,
+      "title": "Chapter 55",
+      "file": "ch-56.json",
+      "words": 2115
+    },
+    {
+      "index": 57,
+      "title": "Chapter 56",
+      "file": "ch-57.json",
+      "words": 1655
+    },
+    {
+      "index": 58,
+      "title": "Chapter 57",
+      "file": "ch-58.json",
+      "words": 1934
+    },
+    {
+      "index": 59,
+      "title": "Chapter 58",
+      "file": "ch-59.json",
+      "words": 2476
+    },
+    {
+      "index": 60,
+      "title": "Chapter 59",
+      "file": "ch-60.json",
+      "words": 1817
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/7423"
+  }
+}

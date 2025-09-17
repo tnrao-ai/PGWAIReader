@@ -1,0 +1,198 @@
+{
+  "id": 4075,
+  "title": "The Intrusion of Jimmy",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 67946,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Chapter 1",
+      "file": "ch-01.json",
+      "words": 127
+    },
+    {
+      "index": 2,
+      "title": "Chapter 1",
+      "file": "ch-02.json",
+      "words": 2643
+    },
+    {
+      "index": 3,
+      "title": "Chapter 2",
+      "file": "ch-03.json",
+      "words": 1981
+    },
+    {
+      "index": 4,
+      "title": "Chapter 3",
+      "file": "ch-04.json",
+      "words": 1351
+    },
+    {
+      "index": 5,
+      "title": "Chapter 4",
+      "file": "ch-05.json",
+      "words": 1093
+    },
+    {
+      "index": 6,
+      "title": "Chapter 5",
+      "file": "ch-06.json",
+      "words": 1803
+    },
+    {
+      "index": 7,
+      "title": "Chapter 6",
+      "file": "ch-07.json",
+      "words": 2116
+    },
+    {
+      "index": 8,
+      "title": "Chapter 7",
+      "file": "ch-08.json",
+      "words": 2129
+    },
+    {
+      "index": 9,
+      "title": "Chapter 8",
+      "file": "ch-09.json",
+      "words": 1632
+    },
+    {
+      "index": 10,
+      "title": "Chapter 9",
+      "file": "ch-10.json",
+      "words": 2654
+    },
+    {
+      "index": 11,
+      "title": "Chapter 10",
+      "file": "ch-11.json",
+      "words": 1607
+    },
+    {
+      "index": 12,
+      "title": "Chapter 11",
+      "file": "ch-12.json",
+      "words": 3255
+    },
+    {
+      "index": 13,
+      "title": "Chapter 12",
+      "file": "ch-13.json",
+      "words": 2978
+    },
+    {
+      "index": 14,
+      "title": "Chapter 13",
+      "file": "ch-14.json",
+      "words": 1899
+    },
+    {
+      "index": 15,
+      "title": "Chapter 14",
+      "file": "ch-15.json",
+      "words": 2809
+    },
+    {
+      "index": 16,
+      "title": "Chapter 15",
+      "file": "ch-16.json",
+      "words": 2340
+    },
+    {
+      "index": 17,
+      "title": "Chapter 16",
+      "file": "ch-17.json",
+      "words": 3198
+    },
+    {
+      "index": 18,
+      "title": "Chapter 17",
+      "file": "ch-18.json",
+      "words": 2550
+    },
+    {
+      "index": 19,
+      "title": "Chapter 18",
+      "file": "ch-19.json",
+      "words": 2180
+    },
+    {
+      "index": 20,
+      "title": "Chapter 19",
+      "file": "ch-20.json",
+      "words": 2411
+    },
+    {
+      "index": 21,
+      "title": "Chapter 20",
+      "file": "ch-21.json",
+      "words": 2441
+    },
+    {
+      "index": 22,
+      "title": "Chapter 21",
+      "file": "ch-22.json",
+      "words": 1077
+    },
+    {
+      "index": 23,
+      "title": "Chapter 22",
+      "file": "ch-23.json",
+      "words": 2298
+    },
+    {
+      "index": 24,
+      "title": "Chapter 23",
+      "file": "ch-24.json",
+      "words": 3438
+    },
+    {
+      "index": 25,
+      "title": "Chapter 24",
+      "file": "ch-25.json",
+      "words": 2587
+    },
+    {
+      "index": 26,
+      "title": "Chapter 25",
+      "file": "ch-26.json",
+      "words": 2506
+    },
+    {
+      "index": 27,
+      "title": "Chapter 26",
+      "file": "ch-27.json",
+      "words": 1826
+    },
+    {
+      "index": 28,
+      "title": "Chapter 27",
+      "file": "ch-28.json",
+      "words": 3306
+    },
+    {
+      "index": 29,
+      "title": "Chapter 28",
+      "file": "ch-29.json",
+      "words": 1845
+    },
+    {
+      "index": 30,
+      "title": "Chapter 29",
+      "file": "ch-30.json",
+      "words": 3253
+    },
+    {
+      "index": 31,
+      "title": "Chapter 30",
+      "file": "ch-31.json",
+      "words": 613
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/4075"
+  }
+}

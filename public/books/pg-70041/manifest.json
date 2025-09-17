@@ -1,0 +1,18 @@
+{
+  "id": 70041,
+  "title": "The small bachelor",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 71716,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 71716
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/70041"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": 10586,
+  "title": "Mike and Psmith",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 54145,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 54145
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/10586"
+  }
+}

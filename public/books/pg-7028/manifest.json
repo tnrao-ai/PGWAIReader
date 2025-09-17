@@ -1,0 +1,18 @@
+{
+  "id": 7028,
+  "title": "The Clicking of Cuthbert",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 61145,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Part 1",
+      "file": "ch-01.json",
+      "words": 61145
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/7028"
+  }
+}

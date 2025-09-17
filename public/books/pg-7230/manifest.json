@@ -1,0 +1,186 @@
+{
+  "id": 7230,
+  "title": "Not George Washington — an Autobiographical Novel",
+  "author": "Wodehouse, P. G. (Pelham Grenville), Westbrook, H. W. (Herbert Wetton)",
+  "wordCount": 51860,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Chapter 1",
+      "file": "ch-01.json",
+      "words": 1726
+    },
+    {
+      "index": 2,
+      "title": "Chapter 1",
+      "file": "ch-02.json",
+      "words": 1568
+    },
+    {
+      "index": 3,
+      "title": "Chapter 2",
+      "file": "ch-03.json",
+      "words": 2061
+    },
+    {
+      "index": 4,
+      "title": "Chapter 3",
+      "file": "ch-04.json",
+      "words": 2061
+    },
+    {
+      "index": 5,
+      "title": "Chapter 4",
+      "file": "ch-05.json",
+      "words": 1891
+    },
+    {
+      "index": 6,
+      "title": "Chapter 5",
+      "file": "ch-06.json",
+      "words": 1957
+    },
+    {
+      "index": 7,
+      "title": "Chapter 6",
+      "file": "ch-07.json",
+      "words": 1672
+    },
+    {
+      "index": 8,
+      "title": "Chapter 7",
+      "file": "ch-08.json",
+      "words": 1606
+    },
+    {
+      "index": 9,
+      "title": "Chapter 8",
+      "file": "ch-09.json",
+      "words": 1573
+    },
+    {
+      "index": 10,
+      "title": "Chapter 9",
+      "file": "ch-10.json",
+      "words": 1826
+    },
+    {
+      "index": 11,
+      "title": "Chapter 10",
+      "file": "ch-11.json",
+      "words": 2528
+    },
+    {
+      "index": 12,
+      "title": "Chapter 11",
+      "file": "ch-12.json",
+      "words": 2500
+    },
+    {
+      "index": 13,
+      "title": "Chapter 12",
+      "file": "ch-13.json",
+      "words": 2657
+    },
+    {
+      "index": 14,
+      "title": "Chapter 13",
+      "file": "ch-14.json",
+      "words": 1368
+    },
+    {
+      "index": 15,
+      "title": "Chapter 14",
+      "file": "ch-15.json",
+      "words": 1130
+    },
+    {
+      "index": 16,
+      "title": "Chapter 15",
+      "file": "ch-16.json",
+      "words": 1107
+    },
+    {
+      "index": 17,
+      "title": "Chapter 16",
+      "file": "ch-17.json",
+      "words": 1053
+    },
+    {
+      "index": 18,
+      "title": "Chapter 17",
+      "file": "ch-18.json",
+      "words": 1966
+    },
+    {
+      "index": 19,
+      "title": "Chapter 18",
+      "file": "ch-19.json",
+      "words": 1680
+    },
+    {
+      "index": 20,
+      "title": "Chapter 19",
+      "file": "ch-20.json",
+      "words": 3305
+    },
+    {
+      "index": 21,
+      "title": "Chapter 20",
+      "file": "ch-21.json",
+      "words": 1083
+    },
+    {
+      "index": 22,
+      "title": "Chapter 21",
+      "file": "ch-22.json",
+      "words": 1998
+    },
+    {
+      "index": 23,
+      "title": "Chapter 22",
+      "file": "ch-23.json",
+      "words": 1660
+    },
+    {
+      "index": 24,
+      "title": "Chapter 23",
+      "file": "ch-24.json",
+      "words": 1845
+    },
+    {
+      "index": 25,
+      "title": "Chapter 24",
+      "file": "ch-25.json",
+      "words": 1719
+    },
+    {
+      "index": 26,
+      "title": "Chapter 25",
+      "file": "ch-26.json",
+      "words": 1624
+    },
+    {
+      "index": 27,
+      "title": "Chapter 26",
+      "file": "ch-27.json",
+      "words": 1634
+    },
+    {
+      "index": 28,
+      "title": "Chapter 27",
+      "file": "ch-28.json",
+      "words": 1961
+    },
+    {
+      "index": 29,
+      "title": "Chapter 28",
+      "file": "ch-29.json",
+      "words": 1101
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/7230"
+  }
+}

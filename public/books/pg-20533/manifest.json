@@ -1,0 +1,144 @@
+{
+  "id": 20533,
+  "title": "Jill the Reckless",
+  "author": "Wodehouse, P. G. (Pelham Grenville)",
+  "wordCount": 112861,
+  "chapters": [
+    {
+      "index": 1,
+      "title": "Chapter 1",
+      "file": "ch-01.json",
+      "words": 129
+    },
+    {
+      "index": 2,
+      "title": "Chapter 1",
+      "file": "ch-02.json",
+      "words": 8998
+    },
+    {
+      "index": 3,
+      "title": "Chapter 2",
+      "file": "ch-03.json",
+      "words": 4281
+    },
+    {
+      "index": 4,
+      "title": "Chapter 3",
+      "file": "ch-04.json",
+      "words": 2183
+    },
+    {
+      "index": 5,
+      "title": "Chapter 4",
+      "file": "ch-05.json",
+      "words": 6256
+    },
+    {
+      "index": 6,
+      "title": "Chapter 5",
+      "file": "ch-06.json",
+      "words": 5509
+    },
+    {
+      "index": 7,
+      "title": "Chapter 6",
+      "file": "ch-07.json",
+      "words": 8641
+    },
+    {
+      "index": 8,
+      "title": "Chapter 7",
+      "file": "ch-08.json",
+      "words": 5156
+    },
+    {
+      "index": 9,
+      "title": "Chapter 8",
+      "file": "ch-09.json",
+      "words": 4368
+    },
+    {
+      "index": 10,
+      "title": "Chapter 9",
+      "file": "ch-10.json",
+      "words": 3694
+    },
+    {
+      "index": 11,
+      "title": "Chapter 10",
+      "file": "ch-11.json",
+      "words": 3601
+    },
+    {
+      "index": 12,
+      "title": "Chapter 11",
+      "file": "ch-12.json",
+      "words": 6121
+    },
+    {
+      "index": 13,
+      "title": "Chapter 12",
+      "file": "ch-13.json",
+      "words": 4792
+    },
+    {
+      "index": 14,
+      "title": "Chapter 13",
+      "file": "ch-14.json",
+      "words": 4836
+    },
+    {
+      "index": 15,
+      "title": "Chapter 14",
+      "file": "ch-15.json",
+      "words": 9258
+    },
+    {
+      "index": 16,
+      "title": "Chapter 15",
+      "file": "ch-16.json",
+      "words": 4292
+    },
+    {
+      "index": 17,
+      "title": "Chapter 16",
+      "file": "ch-17.json",
+      "words": 7918
+    },
+    {
+      "index": 18,
+      "title": "Chapter 17",
+      "file": "ch-18.json",
+      "words": 2972
+    },
+    {
+      "index": 19,
+      "title": "Chapter 18",
+      "file": "ch-19.json",
+      "words": 6945
+    },
+    {
+      "index": 20,
+      "title": "Chapter 19",
+      "file": "ch-20.json",
+      "words": 3153
+    },
+    {
+      "index": 21,
+      "title": "Chapter 20",
+      "file": "ch-21.json",
+      "words": 7779
+    },
+    {
+      "index": 22,
+      "title": "Chapter 21",
+      "file": "ch-22.json",
+      "words": 1979
+    }
+  ],
+  "license": {
+    "termsUrl": "https://www.gutenberg.org/policy/license.html",
+    "landing": "https://www.gutenberg.org/ebooks/20533"
+  }
+}
