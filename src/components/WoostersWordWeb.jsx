@@ -1,89 +1,196 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Wooster’s Word Web (tap-to-toggle version)
+ * Wooster’s Word Web — tap/click to toggle version
  *
- * Props (optional):
- * - className?: string
- * - puzzle?: { grid: string[]; words: string[] }   // grid: array of row strings (equal length), words: target words
- * - dataUrl?: string                               // fallback JSON path if no puzzle prop (default: /content/games/wordweb/today.json)
+ * Behavior:
+ * - Tap/click a cell toggles selection (yellow).
+ * - When the selected set exactly covers any valid straight-line path
+ *   of a target word (any of 8 directions, forward or reverse),
+ *   those cells lock green and are removed from the yellow selection.
  *
- * Expected JSON shape for dataUrl:
- * {
- *   "grid": ["ABCDEFGHIJKL", "MNOPQRSTUVWX", ... 12 rows total],
- *   "words": ["JEEVES", "WOOSTER", ...]
- * }
+ * External controls (from Games.jsx):
+ * - window events: ww:reset, ww:hint, ww:reveal-start, ww:reveal-solution, ww:how
+ *
+ * Data:
+ * - Accepts either prop `puzzle={ grid: string[], words: string[] }`
+ *   or `puzzle={ grid: string[], answers: string[] }`
+ * - If no prop provided, fetches:
+ *     1) /.netlify/functions/wordweb?date=YYYY-MM-DD (America/Chicago)
+ *     2) /content/games/wordweb/daily/YYYY-MM-DD.json
+ *     3) /content/games/wordweb/latest.json
+ *   and falls back to DEFAULT_PUZZLE if all fail.
  */
 
-const DEFAULT_DATA_URL = "/content/games/wordweb/today.json";
+const DEFAULT_PUZZLE = {
+  grid: [
+    "WOOSTERWEZXQ",
+    "QHMVLPYDKRU",
+    "ABJEEVESCNO",
+    "TRGQXNAHFIU",
+    "BLANDINGSQZ",
+    "PCWYROTZMEL",
+    "UVQRTWHISKY",
+    "ONCABGDLPEX",
+    "JJAGATHAVBS",
+    "MZQIRUTEOPC",
+    "LXFDBNCGTHA",
+    "SRVYEWKJIMQ",
+  ],
+  answers: ["WOOSTER", "JEEVES", "BLANDINGS", "WHISKY", "AGATHA"],
+};
 
-// 8 directions: N, NE, E, SE, S, SW, W, NW
+function centralDateStr(d = new Date()) {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const [y, m, day] = fmt.format(d).split("-");
+  return `${y}-${m}-${day}`;
+}
+
+// 8 directions
 const DIRS = [
   [-1, 0], [-1, 1], [0, 1], [1, 1],
   [1, 0], [1, -1], [0, -1], [-1, -1],
 ];
 
-// Utility to make a stable cell id
 const cellId = (r, c, cols) => r * cols + c;
 
-export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFAULT_DATA_URL }) {
-  const [grid, setGrid] = useState(() => (puzzle?.grid ? normalizeGrid(puzzle.grid) : null));
-  const [words, setWords] = useState(() => (puzzle?.words ? normalizeWords(puzzle.words) : null));
+function normalizeGrid(arr) {
+  if (!Array.isArray(arr) || !arr.length) return null;
+  const rows = arr.map((s) => String(s || "").toUpperCase().replace(/[^A-Z]/g, ""));
+  const n = rows[0]?.length || 0;
+  if (!n || rows.some((r) => r.length !== n)) return null;
+  return rows;
+}
+function normalizeWords(arr) {
+  if (!Array.isArray(arr)) return null;
+  return arr.map((s) => String(s || "").toUpperCase().replace(/[^A-Z]/g, "")).filter(Boolean);
+}
+
+function findWordPaths(grid, word) {
+  // Returns ALL straight-line paths for `word` in grid (forward only).
+  // Call it for both `word` and `reversed` to support reverse matches.
+  const R = grid.length;
+  const C = grid[0].length;
+  const paths = [];
+
+  for (let r = 0; r < R; r++) {
+    for (let c = 0; c < C; c++) {
+      if (grid[r][c] !== word[0]) continue;
+      for (const [dr, dc] of DIRS) {
+        let rr = r, cc = c;
+        let ok = true;
+        const ids = [cellId(rr, cc, C)];
+        for (let i = 1; i < word.length; i++) {
+          rr += dr; cc += dc;
+          if (rr < 0 || rr >= R || cc < 0 || cc >= C) { ok = false; break; }
+          if (grid[rr][cc] !== word[i]) { ok = false; break; }
+          ids.push(cellId(rr, cc, C));
+        }
+        if (ok) paths.push(ids);
+      }
+    }
+  }
+  return paths;
+}
+
+export default function WoostersWordWeb({ className = "", puzzle }) {
+  const seed = centralDateStr();
+
+  // Main data
+  const [grid, setGrid] = useState(() => {
+    if (puzzle?.grid) return normalizeGrid(puzzle.grid);
+    return null;
+  });
+  const [words, setWords] = useState(() => {
+    const list = puzzle?.words || puzzle?.answers;
+    if (list) return normalizeWords(list);
+    return null;
+  });
+
   const [loading, setLoading] = useState(!puzzle);
   const [error, setError] = useState("");
 
-  // Selection & progress state
-  const [selected, setSelected] = useState(() => new Set());        // Set<number>
-  const [foundCells, setFoundCells] = useState(() => new Set());    // Set<number>
-  const [foundWords, setFoundWords] = useState(() => new Set());    // Set<string>
+  // Selection & progress
+  const [selected, setSelected] = useState(() => new Set());     // yellow
+  const [foundCells, setFoundCells] = useState(() => new Set()); // green
+  const [foundWords, setFoundWords] = useState(() => new Set()); // word strings
+  const [hintCells, setHintCells] = useState(() => new Set());   // temporary flashes
 
-  // Temporary hint highlights (ids) for reveal-start / hint
-  const [hintCells, setHintCells] = useState(() => new Set());
-
-  // Fetch puzzle if prop not provided
+  // Fetch if no prop
   useEffect(() => {
     if (puzzle) return;
+
     let alive = true;
-    (async () => {
+    const fetchJSON = async (url) => {
       try {
-        setLoading(true);
-        setError("");
-        const resp = await fetch(dataUrl, { cache: "no-cache" });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        const g = normalizeGrid(data?.grid);
-        const w = normalizeWords(data?.words);
-        if (!g || !w) throw new Error("Malformed puzzle data");
-        if (!alive) return;
+        const r = await fetch(url, { cache: "no-cache" });
+        const t = await r.text();
+        let j = null;
+        try { j = JSON.parse(t); } catch {}
+        if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+        return j;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    (async () => {
+      setLoading(true);
+      setError("");
+
+      const base = import.meta.env.BASE_URL || "/";
+      const daily = `${base}content/games/wordweb/daily/${seed}.json?v=${seed}`;
+      const latest = `${base}content/games/wordweb/latest.json?v=${seed}`;
+
+      let data =
+        (await fetchJSON(`/.netlify/functions/wordweb?date=${seed}`)) ||
+        (await fetchJSON(daily)) ||
+        (await fetchJSON(latest)) ||
+        DEFAULT_PUZZLE;
+
+      if (!alive) return;
+
+      const g = normalizeGrid(data?.grid);
+      const list = data?.words || data?.answers;
+      const w = normalizeWords(list || []);
+      if (!g || !w) {
+        setError("Malformed puzzle data");
+        const gg = normalizeGrid(DEFAULT_PUZZLE.grid);
+        const ww = normalizeWords(DEFAULT_PUZZLE.answers);
+        setGrid(gg);
+        setWords(ww);
+      } else {
         setGrid(g);
         setWords(w);
-      } catch (e) {
-        setError(e?.message || "Failed to load puzzle");
-      } finally {
-        if (alive) setLoading(false);
       }
+      setLoading(false);
     })();
-    return () => { alive = false; };
-  }, [puzzle, dataUrl]);
 
-  // Dimensions
+    return () => { alive = false; };
+  }, [puzzle, seed]);
+
   const rows = grid?.length || 0;
   const cols = rows ? grid[0].length : 0;
 
-  // Precompute all possible paths (list of arrays of cell ids) where each word appears in grid.
-  // We accept any occurrence; the moment user selects *one* full path of a word, it locks in.
+  // Precompute all word paths (forward + reverse)
   const wordPaths = useMemo(() => {
     if (!grid || !words) return new Map();
-    const map = new Map(); // word -> Array<Array<number>>
-    for (const word of words) {
-      const upp = word.toUpperCase().replace(/[^A-Z]/g, "");
-      const paths = findWordPaths(grid, upp);
-      map.set(upp, paths);
+    const map = new Map();
+    for (const w of words) {
+      const fwd = findWordPaths(grid, w);
+      const rev = findWordPaths(grid, w.split("").reverse().join(""));
+      // Merge; no need to dedupe aggressively
+      map.set(w, [...fwd, ...rev]);
     }
     return map;
   }, [grid, words]);
 
-  // Event listeners from Games top bar:
+  // ---- External controls (via window events) ----
   useEffect(() => {
     const onReset = () => {
       setSelected(new Set());
@@ -92,37 +199,33 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
       setHintCells(new Set());
     };
     const onHint = () => {
-      if (!words) return;
-      // Choose first unfound word and highlight its first cell briefly
-      const target = words.find(w => !foundWords.has(w.toUpperCase()));
+      // Flash the starting cell of the first unfound word's first path
+      const target = words?.find((w) => !foundWords.has(w));
       if (!target) return;
-      const paths = wordPaths.get(target.toUpperCase()) || [];
+      const paths = wordPaths.get(target) || [];
       if (!paths.length) return;
-      const firstPath = paths[0];
-      const firstCell = firstPath[0];
-      flashHint([firstCell]);
+      flashHint([paths[0][0]]);
     };
     const onRevealStart = () => {
       if (!words) return;
-      const starts = [];
+      const ids = [];
       for (const w of words) {
-        if (foundWords.has(w.toUpperCase())) continue;
-        const paths = wordPaths.get(w.toUpperCase()) || [];
-        if (paths.length) starts.push(paths[0][0]);
+        if (foundWords.has(w)) continue;
+        const p = wordPaths.get(w);
+        if (p?.length) ids.push(p[0][0]);
       }
-      if (starts.length) flashHint(starts);
+      if (ids.length) flashHint(ids);
     };
     const onRevealSolution = () => {
       if (!words) return;
       const newFoundCells = new Set(foundCells);
       const newFoundWords = new Set(foundWords);
       for (const w of words) {
-        const upp = w.toUpperCase();
-        if (newFoundWords.has(upp)) continue;
-        const paths = wordPaths.get(upp) || [];
+        if (newFoundWords.has(w)) continue;
+        const paths = wordPaths.get(w) || [];
         if (!paths.length) continue;
         for (const id of paths[0]) newFoundCells.add(id);
-        newFoundWords.add(upp);
+        newFoundWords.add(w);
       }
       setFoundCells(newFoundCells);
       setFoundWords(newFoundWords);
@@ -130,8 +233,7 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
     };
     const onHow = () => {
       alert(
-        "Tap letters to select (yellow). When your selection completes any hidden word along a straight line, "\
-        + "those letters lock in green. Tap again to deselect yellow letters. Use Reset to clear."
+        "Tap letters to select (yellow). When your selection completes any hidden word along a straight line, those letters lock in green. Tap again to deselect yellow letters. Use Reset to clear."
       );
     };
 
@@ -157,7 +259,7 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
     flashTimer.current = setTimeout(() => setHintCells(new Set()), 1200);
   };
 
-  // Toggle selection for a cell (ignore if already found)
+  // Toggle a cell (ignore if already found)
   const toggleCell = (r, c) => {
     if (!grid) return;
     const id = cellId(r, c, cols);
@@ -168,10 +270,10 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
     else next.add(id);
     setSelected(next);
 
-    // After toggling, check if any unfound word now has a full path selected → lock it green
     maybeLockWords(next);
   };
 
+  // If a whole word path is covered by current selection -> lock it (green)
   const maybeLockWords = (sel) => {
     if (!words) return;
     let changed = false;
@@ -179,21 +281,18 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
     const newFoundWords = new Set(foundWords);
 
     for (const w of words) {
-      const upp = w.toUpperCase();
-      if (newFoundWords.has(upp)) continue;
-      const paths = wordPaths.get(upp) || [];
+      if (newFoundWords.has(w)) continue;
+      const paths = wordPaths.get(w) || [];
       for (const path of paths) {
-        // Path is a match if ALL cells in the path are currently selected (yellow)
-        if (path.every(id => sel.has(id))) {
-          // Lock these cells as found (green)
+        if (path.every((id) => sel.has(id))) {
+          // lock these cells green and remove from yellow selection
           for (const id of path) {
             newFoundCells.add(id);
-            // remove from yellow selection once found
-            if (sel.has(id)) sel.delete(id);
+            sel.delete(id);
           }
-          newFoundWords.add(upp);
+          newFoundWords.add(w);
           changed = true;
-          break; // stop checking more paths for this word
+          break;
         }
       }
     }
@@ -215,9 +314,9 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
     return <div className={`text-sm text-red-600 ${className}`}>Failed to load puzzle. {error}</div>;
   }
 
+  // Render
   return (
     <div className={`w-full ${className}`}>
-      {/* Grid */}
       <div
         role="grid"
         aria-label="Word search grid"
@@ -225,7 +324,6 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
         style={{
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
           gap: "2px",
-          // Let parent size/zoom control overall footprint
           maxWidth: "min(92vw, 720px)",
           marginInline: "auto",
         }}
@@ -238,11 +336,11 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
             const isHint = hintCells.has(id);
 
             const bg = isFound
-              ? "rgba(16,185,129,0.22)"         // green-ish (matches .ww-correct)
+              ? "rgba(16,185,129,0.22)"  // green-ish
               : isSel
-              ? "#fde68a"                        // yellow for selected
+              ? "#fde68a"                 // yellow
               : isHint
-              ? "rgba(59,130,246,0.18)"         // subtle blue flash for hint
+              ? "rgba(59,130,246,0.18)"  // subtle blue
               : "white";
 
             return (
@@ -251,8 +349,7 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
                 role="gridcell"
                 aria-pressed={isSel || isFound}
                 onClick={() => toggleCell(r, c)}
-                className={`flex items-center justify-center border rounded text-base sm:text-lg md:text-xl font-semibold
-                            ${isFound ? "ww-correct" : ""}`}
+                className={`flex items-center justify-center border rounded text-base sm:text-lg md:text-xl font-semibold ${isFound ? "ww-correct" : ""}`}
                 style={{
                   aspectRatio: "1 / 1",
                   background: bg,
@@ -278,48 +375,4 @@ export default function WoostersWordWeb({ className = "", puzzle, dataUrl = DEFA
       </div>
     </div>
   );
-}
-
-/* ------------------------
-   Helpers
--------------------------*/
-
-function normalizeGrid(arr) {
-  if (!Array.isArray(arr) || !arr.length) return null;
-  const rows = arr.map(s => String(s || "").toUpperCase().replace(/[^A-Z]/g, ""));
-  const n = rows[0]?.length || 0;
-  if (!n || rows.some(r => r.length !== n)) return null;
-  return rows;
-}
-
-function normalizeWords(arr) {
-  if (!Array.isArray(arr)) return null;
-  return arr
-    .map(s => String(s || "").toUpperCase().replace(/[^A-Z]/g, ""))
-    .filter(Boolean);
-}
-
-function findWordPaths(grid, word) {
-  const R = grid.length;
-  const C = grid[0].length;
-  const paths = [];
-
-  for (let r = 0; r < R; r++) {
-    for (let c = 0; c < C; c++) {
-      if (grid[r][c] !== word[0]) continue;
-      for (const [dr, dc] of DIRS) {
-        let rr = r, cc = c;
-        let ok = true;
-        const ids = [cellId(rr, cc, C)];
-        for (let i = 1; i < word.length; i++) {
-          rr += dr; cc += dc;
-          if (rr < 0 || rr >= R || cc < 0 || cc >= C) { ok = false; break; }
-          if (grid[rr][cc] !== word[i]) { ok = false; break; }
-          ids.push(cellId(rr, cc, C));
-        }
-        if (ok) paths.push(ids);
-      }
-    }
-  }
-  return paths;
 }
