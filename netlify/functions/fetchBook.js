@@ -1,22 +1,22 @@
 // netlify/functions/fetchBook.js
 import fetch from 'node-fetch';
 
+// Block these non-Wodehouse IDs everywhere
+const DENYLIST = new Set([43317, 44143, 63727, 63736]);
+
+// Markers & helpers
 const START_RE = /^\s*[*]{3}\s*START OF (THIS|THE) PROJECT GUTENBERG EBOOK[\s\S]*?[*]{3}\s*$/mi;
 const END_RE   = /^\s*[*]{3}\s*END OF (THIS|THE) PROJECT GUTENBERG EBOOK[\s\S]*?[*]{3}\s*$/mi;
 
-// Headings & front matter
 const CONTENTS_RE = /^\s*CONTENTS\s*$/mi;
 const PRODUCED_BY_RE = /^(?:produced by|e-?text prepared by|transcriber'?s note)/i;
 const FIRST_CHAPTER_RE =
   /\n\s*(?:CHAPTER|Chapter)\s+(?:[IVXLCDM]+|\d+)(?:\.\s*[A-Z][^\n]{0,80})?\s*\n/;
 
-// HTML checks
 function isHtmlMime(mime) {
   const m = (mime || '').toLowerCase();
   return m.includes('text/html') || m.includes('application/xhtml+xml');
 }
-
-/* ---------- Core helpers ---------- */
 
 function sliceBetweenMarkers(str) {
   const start = str.search(START_RE);
@@ -47,84 +47,42 @@ function stripTagsKeepText(html) {
   return s.trim();
 }
 
-// Remove front matter before the first chapter; also drop “CONTENTS” & producer notes
 function stripFrontMatterToFirstChapter(text) {
   const lines = text.split('\n');
-
-  // Step 1: normalize obvious boilerplate lines at the very top
   let i = 0;
+
   while (i < lines.length) {
     const line = lines[i].trim();
-
-    // Empty / whitespace-only
     if (!line) { i++; continue; }
 
-    // Contents heading near top? mark but keep scanning until we find first chapter
     if (CONTENTS_RE.test(line)) {
-      // skip the "CONTENTS" heading and following lines until a blank line
-      i++;
-      while (i < lines.length && lines[i].trim()) i++;
-      // continue scanning – we still want to jump to first CHAPTER later
-      i++; // consume the blank
-      continue;
+      i++; while (i < lines.length && lines[i].trim()) i++; i++; continue;
     }
-
-    // Transcriber's note / produced by / e-text prepared by
     if (PRODUCED_BY_RE.test(line)) {
-      // skip this block up to next blank line
-      i++;
-      while (i < lines.length && lines[i].trim()) i++;
-      i++;
-      continue;
+      i++; while (i < lines.length && lines[i].trim()) i++; i++; continue;
     }
-
-    // If we encounter "CHAPTER ..." early, break here
-    if (/^(?:CHAPTER|Chapter)\s+(?:[IVXLCDM]+|\d+)/.test(line)) {
-      break;
-    }
-
-    // Preface/Intro/Editor’s note first? keep scanning but allow skip
+    if (/^(?:CHAPTER|Chapter)\s+(?:[IVXLCDM]+|\d+)/.test(line)) break;
     if (/^(PREFACE|FOREWORD|INTRODUCTION|Editor'?s Note)/i.test(line)) {
-      // treat as front matter – skip that block
-      i++;
-      while (i < lines.length && lines[i].trim()) i++;
-      i++;
-      continue;
+      i++; while (i < lines.length && lines[i].trim()) i++; i++; continue;
     }
-
-    // If it looks like a decorative title/author page, skip a few lines
-    if (/^by\s+P\.\s*G\.\s*Wodehouse/i.test(line) || /^P\.\s*G\.\s*Wodehouse$/i.test(line)) {
-      i++;
-      continue;
-    }
-
-    // Otherwise, if we haven't reached a chapter, keep advancing cautiously
+    if (/^by\s+P\.\s*G\.\s*Wodehouse/i.test(line) || /^P\.\s*G\.\s*Wodehouse$/i.test(line)) { i++; continue; }
     i++;
-    // Safety stop: don't skip more than, say, first 400 lines—fallback if no chapters exist
     if (i > 400) break;
   }
 
-  // At this point, i is roughly where content should start (either first chapter heading or later)
   const firstChapterIdx = text.search(FIRST_CHAPTER_RE);
-  if (firstChapterIdx !== -1) {
-    // start from the first chapter heading
-    return text.slice(firstChapterIdx).trim();
-  }
-
-  // No chapter headings found: return trimmed text (e.g., short stories without formal “Chapter 1”)
+  if (firstChapterIdx !== -1) return text.slice(firstChapterIdx).trim();
   return text.trim();
 }
 
 function chapterizeFromText(title, body) {
-  // 1) Strict “CHAPTER I” / “Chapter 1”
+  // Strict CHAPTER splits
   const parts1 = body.split(/\n\s*(?:CHAPTER|Chapter)\s+(?:[IVXLCDM]+|\d+)(?:\.[^\n]*)?\s*\n/);
   if (parts1.length > 1) {
-    return parts1
-      .map((p, i) => ({ title: `Chapter ${i || 1}`, content: p.trim() }))
-      .filter(c => c.content);
+    return parts1.map((p, i) => ({ title: `Chapter ${i || 1}`, content: p.trim() }))
+                 .filter(c => c.content);
   }
-
-  // 2) Short-story style (ALL CAPS headings)
+  // ALL CAPS story titles
   const storySplit = body.split(/\n{1,3}([A-Z][A-Z '\-:.0-9]{4,})\n{1,3}/);
   if (storySplit.length > 1) {
     const chapters = [];
@@ -135,37 +93,27 @@ function chapterizeFromText(title, body) {
     }
     if (chapters.length) return chapters;
   }
-
-  // 3) Fallback: paragraph chunks
+  // Fallback: chunk by ~60 paragraphs
   const paras = body.split(/\n{2,}/);
-  const chunkSize = 60;
-  const chapters = [];
-  for (let i = 0; i < paras.length; i += chunkSize) {
-    const slice = paras.slice(i, i + chunkSize).join('\n\n').trim();
-    if (slice) chapters.push({ title: `Part ${1 + (i / chunkSize|0)}`, content: slice });
+  const size = 60;
+  const out = [];
+  for (let i = 0; i < paras.length; i += size) {
+    const slice = paras.slice(i, i + size).join('\n\n').trim();
+    if (slice) out.push({ title: `Part ${1 + (i/size|0)}`, content: slice });
   }
-  return chapters;
+  return out;
 }
 
-// Produce a neater chapter title from the first non-empty line
 function tidyChapterTitle(rawTitle, fallback) {
   if (!rawTitle) return fallback;
   let t = rawTitle.trim();
-
-  // De-shout if it’s full uppercase but not Roman numerals only
   if (t.length <= 120 && /[A-Z]/.test(t) && t === t.toUpperCase() && !/^[IVXLCDM. ]+$/.test(t)) {
     t = t[0] + t.slice(1).toLowerCase();
   }
-
-  // Strip decorative dots / trailing hyphens
   t = t.replace(/^[\s.\-–—]+|[\s.\-–—]+$/g, '');
-
-  // Keep it sane
   if (!t || t.length > 140) return fallback;
   return t;
 }
-
-/* ---------- Handler ---------- */
 
 export const handler = async (event) => {
   try {
@@ -174,26 +122,18 @@ export const handler = async (event) => {
     const title = event.queryStringParameters.title || '';
 
     if (!id) return { statusCode: 400, body: 'Missing id' };
+    if (DENYLIST.has(id)) return { statusCode: 403, body: 'This title is not available in this library.' };
 
-    // Canonical candidates
     const textUtf = `https://www.gutenberg.org/ebooks/${id}.txt.utf-8`;
     const textAlt = `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`;
     const htmlUrl = `https://www.gutenberg.org/cache/epub/${id}/pg${id}-images.html`;
 
     const tryFetch = async (u) => fetch(u, { headers: { 'User-Agent': 'PGWAIReader (Netlify Function)' } });
 
-    // Prefer text → HTML → alternate text
     let url = prefer === 'html' ? htmlUrl : textUtf;
     let res = await tryFetch(url);
-
-    if (!res.ok && prefer !== 'html') {
-      url = htmlUrl;
-      res = await tryFetch(url);
-    }
-    if (!res.ok) {
-      url = textAlt;
-      res = await tryFetch(url);
-    }
+    if (!res.ok && prefer !== 'html') { url = htmlUrl; res = await tryFetch(url); }
+    if (!res.ok) { url = textAlt; res = await tryFetch(url); }
     if (!res.ok) throw new Error(`Fetch failed ${res.status} for ${url}`);
 
     const mime = res.headers.get('content-type') || '';
@@ -205,9 +145,7 @@ export const handler = async (event) => {
       const sliced = sliceBetweenMarkers(html);
       const textish = stripTagsKeepText(sliced);
       const trimmed = stripFrontMatterToFirstChapter(textish);
-      chapters = chapterizeFromText(title, trimmed);
-      // Improve headings using first line of each chapter when sensible
-      chapters = chapters.map((c, i) => {
+      chapters = chapterizeFromText(title, trimmed).map((c, i) => {
         const firstLine = (c.content.split(/\n+/).find(x => x.trim()) || '').trim();
         const better = tidyChapterTitle(firstLine, c.title || `Chapter ${i||1}`);
         return { title: better, content: c.content };
@@ -216,8 +154,7 @@ export const handler = async (event) => {
     } else {
       const raw = await res.text();
       const body = stripFrontMatterToFirstChapter(sliceBetweenMarkers(raw));
-      chapters = chapterizeFromText(title, body);
-      chapters = chapters.map((c, i) => {
+      chapters = chapterizeFromText(title, body).map((c, i) => {
         const firstLine = (c.content.split(/\n+/).find(x => x.trim()) || '').trim();
         const better = tidyChapterTitle(firstLine, c.title || `Chapter ${i||1}`);
         return { title: better, content: c.content };
@@ -225,7 +162,6 @@ export const handler = async (event) => {
       wordCount = body.split(/\s+/).filter(Boolean).length;
     }
 
-    // Final prune
     chapters = (chapters || []).filter(c => c && typeof c.content === 'string' && c.content.trim());
 
     const license = {

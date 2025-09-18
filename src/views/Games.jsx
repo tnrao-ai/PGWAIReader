@@ -3,10 +3,7 @@ import WoostersWordWeb from "../components/WoostersWordWeb.jsx";
 import JeevesJottings from "../components/JeevesJottings.jsx";
 import StatsPanel from "../components/StatsPanel.jsx";
 
-/* ----------------------------------------------------
-   Touch/Pan/Zoom guard: block page scroll outside,
-   allow panning inside the puzzle scroller on mobile.
----------------------------------------------------- */
+/* Touch/Pan/Zoom guard: block page scroll outside, allow panning inside the puzzle scroller on mobile. */
 function PuzzleTouchGuard({ className = "", lockScroll = true, children }) {
   const ref = useRef(null);
 
@@ -16,7 +13,6 @@ function PuzzleTouchGuard({ className = "", lockScroll = true, children }) {
 
     const scroller = root.querySelector(".puzzle-scroller");
 
-    // Lock body scroll while the puzzle area is mounted
     const originalOverflow = document.body.style.overflow;
     if (lockScroll) document.body.style.overflow = "hidden";
 
@@ -55,9 +51,7 @@ function PuzzleTouchGuard({ className = "", lockScroll = true, children }) {
   );
 }
 
-/* ----------------------------------------------------
-   Zoom hook (CSS zoom where available, transform fallback)
----------------------------------------------------- */
+/* Zoom hook (CSS zoom where available, transform fallback) */
 function useZoom() {
   const [level, setLevel] = useState(1);
   const supportsZoom = typeof document !== "undefined" && "zoom" in document.documentElement.style;
@@ -75,10 +69,7 @@ function useZoom() {
   return { level, style, set, inc, dec, reset };
 }
 
-/* ----------------------------------------------------
-   Utility: dispatch a global custom event so the puzzle
-   can react without tight coupling.
----------------------------------------------------- */
+/* Global event fire helper so puzzle can listen (optional) */
 function fire(name) {
   window.dispatchEvent(new CustomEvent(name));
 }
@@ -99,7 +90,7 @@ export default function Games() {
   const tabs = ["Wooster’s Word Web", "Jeeves’ Jottings", "Dictionary Stats", "Legal"];
   const [tab, setTab] = useState(tabs[0]);
 
-  // Hide the global footer while on the Games view to reclaim vertical space
+  // Hide the global footer while on Games to reclaim space
   useEffect(() => {
     const footer = document.querySelector("footer");
     if (!footer) return;
@@ -108,7 +99,7 @@ export default function Games() {
     return () => { footer.style.display = prev; };
   }, []);
 
-  // Desktop detection to mirror CSS @media (min-width:1024px)
+  // Desktop detection (mirror CSS @media min-width:1024px)
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== "undefined" ? window.matchMedia("(min-width:1024px)").matches : false
   );
@@ -129,14 +120,14 @@ export default function Games() {
   const scrollerRef = useRef(null);
   const contentRef = useRef(null);
 
-  // Dynamically compute scroller height to use the whole viewport minus our compact bars & a footer reserve
+  // Compute inner height on mobile to fill viewport under our compact bars
   const [scrollerHeight, setScrollerHeight] = useState(null);
   useEffect(() => {
     const compute = () => {
       if (!scrollerRef.current) return;
       const rectTop = scrollerRef.current.getBoundingClientRect().top;
       const vh = window.innerHeight;
-      const reserve = isDesktop ? 160 : 120; // space below for score/messages
+      const reserve = isDesktop ? 200 : 120; // room below for scoreline/whitespace
       const h = Math.max(200, Math.floor(vh - rectTop - reserve));
       setScrollerHeight(h);
     };
@@ -149,7 +140,7 @@ export default function Games() {
     };
   }, [isDesktop, tab]);
 
-  // Auto-fit the puzzle on mobile: measure content vs available height/width
+  // Auto-fit (mobile only)
   useEffect(() => {
     if (tab !== "Wooster’s Word Web") return;
 
@@ -270,46 +261,44 @@ export default function Games() {
         <div className="flex items-center justify-between gap-2">
           <div className="text-sm text-gray-600 dark:text-gray-300">{today}</div>
           <div className="flex items-center gap-1 flex-wrap">
-            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:reset")} title="Reset">
-              Reset
-            </button>
-            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:hint")} title="Hint">
-              Hint
-            </button>
-            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:reveal-start")} title="Reveal starting letters">
-              Reveal Start
-            </button>
-            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:reveal-solution")} title="Reveal full solution">
-              Reveal Solution
-            </button>
-            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:how")} title="How to play">
-              How
-            </button>
+            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:reset")} title="Reset">Reset</button>
+            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:hint")} title="Hint">Hint</button>
+            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:reveal-start")} title="Reveal starting letters">Reveal Start</button>
+            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:reveal-solution")} title="Reveal full solution">Reveal Solution</button>
+            <button className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-700" onClick={() => fire("ww:how")} title="How to play">How</button>
           </div>
         </div>
       )}
 
-      {/* Content sections */}
+      {/* Content */}
       {tab === "Wooster’s Word Web" && (
-        <section className="bg-white dark:bg-gray-800 rounded-xl shadow p-2 sm:p-3">
-          <PuzzleTouchGuard>
+        <section className="bg-white dark:bg-gray-800 rounded-xl shadow p-2 sm:p-3 pb-8">
+          {/* Make desktop scroll normally; lock only on mobile */}
+          <PuzzleTouchGuard lockScroll={!isDesktop}>
             <div
               ref={scrollerRef}
               className="puzzle-scroller rounded-lg"
               style={{
-                // desktop: CSS media query makes overflow visible automatically
-                overflow: isDesktop ? undefined : fullyFits ? "hidden" : "auto",
-                height: isDesktop ? undefined : scrollerHeight ? `${scrollerHeight}px` : undefined,
+                // Desktop: no inner scroll; Mobile: only if it doesn't fully fit
+                overflow: isDesktop ? "visible" : (fullyFits ? "hidden" : "auto"),
+                height: isDesktop ? "auto" : (scrollerHeight ? `${scrollerHeight}px` : undefined),
+                maxHeight: isDesktop ? "none" : undefined,
                 WebkitOverflowScrolling: "touch",
                 touchAction: "pan-x pan-y",
                 overscrollBehavior: "contain",
                 background: "transparent",
               }}
             >
-              <div className="p-2">
+              <div className="p-2 ww-compact">
+                {/* Hide duplicate big headers/theme/date inside puzzle (if present) */}
+                <style jsx="true">{`
+                  .ww-compact :is(h1,h2):first-of-type { display: none !important; }
+                  .ww-compact time, .ww-compact .date, .ww-compact [data-date] { display: none !important; }
+                  .ww-compact .theme, .ww-compact [data-theme], .ww-compact .ww-theme { display: none !important; }
+                `}</style>
+
                 {/* Zoom wrapper */}
                 <div className="puzzle-zoom" style={zoom.style}>
-                  {/* Measured content (the board) */}
                   <div ref={contentRef}>
                     <WoostersWordWeb className="puzzle-pointer-surface" />
                   </div>
@@ -319,10 +308,8 @@ export default function Games() {
           </PuzzleTouchGuard>
 
           {/* Score / status line directly under the puzzle */}
-          <div id="ww-score-slot" className="mt-2 text-sm text-gray-700 dark:text-gray-200">
-            {/* If WoostersWordWeb doesn't render its own score line,
-                you can update this element from the game logic, or
-                leave it as is for layout spacing. */}
+          <div id="ww-score-slot" className="mt-3 text-sm text-gray-700 dark:text-gray-200">
+            {/* Your game logic can set text here if it doesn't already render its own score. */}
           </div>
         </section>
       )}
