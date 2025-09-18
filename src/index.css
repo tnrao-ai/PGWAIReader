@@ -8,77 +8,86 @@ body {
 }
 
 /* ==========================================================
-   Mobile puzzle stability (prevents page jiggle while dragging)
+   Mobile/Touch stability for puzzles
    ========================================================== */
 
-/* Wrap the puzzle area in this class (done in Games.jsx) */
+/* Outer guard: blocks page gestures outside the internal scroller */
 .puzzle-touch-guard {
-  /* Block browser pan/zoom gestures outside our internal scroller */
-  touch-action: none;               /* modern gesture lock */
-  -ms-touch-action: none;           /* legacy Edge */
-
-  /* Stop scroll chaining (no rubber-band bounce into the page) */
-  overscroll-behavior: contain;
-
-  /* Keep taps from selecting text / showing callouts */
+  touch-action: none;               /* lock page gestures; inner scroller opts back in */
+  -ms-touch-action: none;
+  overscroll-behavior: contain;     /* no rubber-band into page */
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-
-  /* Help some WebViews treat this like a “solid” region */
   position: relative;
 }
 
-/* The inner scroll container that allows two-axis panning for big grids */
+/* Inner scroll area: allows two-axis panning for big grids on small screens */
 .puzzle-scroller {
   overflow: auto;
-  /* Allow 2D panning inside the scroller while the outer guard blocks page scroll */
-  touch-action: pan-x pan-y;
+  touch-action: pan-x pan-y;        /* re-enable panning inside */
   overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch; /* smooth iOS scrolling */
+  -webkit-overflow-scrolling: touch;
   max-width: 100%;
-  max-height: 75vh; /* adjust as desired */
+  max-height: 85vh;                 /* taller so you can see more rows; was 75vh */
   background: transparent;
   border-radius: 0.5rem;
 }
 
-/* Optional: keep the puzzle visually bounded and non-scrollable (legacy variant) */
-.puzzle-touch-guard-fixed {
-  max-width: 100%;
-  max-height: 75vh;  /* ensures room for controls */
-  overflow: hidden;
-  border-radius: 0.75rem; /* matches rounded-xl vibe */
+/* Zoom wrapper: make scaling predictable in all engines */
+.puzzle-zoom {
+  display: inline-block;            /* so scaled box sizes to content */
+  transform-origin: top left;       /* for transform fallback */
 }
 
-/* Buttons/links inside can still be tapped rapidly without double-tap zoom */
+/* (Legacy variant) visually bounded area with no internal scroll */
+.puzzle-touch-guard-fixed {
+  max-width: 100%;
+  max-height: 85vh;
+  overflow: hidden;
+  border-radius: 0.75rem;
+}
+
+/* Buttons/links inside still tap quickly */
 .puzzle-touch-guard button,
 .puzzle-touch-guard a {
   touch-action: manipulation;
 }
 
-/* (Optional) utility for puzzle grids that rely on pointer events */
+/* Pointer-friendly hint class for grids */
 .puzzle-pointer-surface {
-  /* Encourage the browser to treat as interactive hit-area */
   cursor: pointer;
   -webkit-user-drag: none;
 }
 
-/* (Optional) subtle selection highlight class you can add to cells */
+/* Optional highlights for selected/correct cells */
 .ww-selected {
   background-color: rgba(59,130,246,0.18); /* Tailwind blue-500 @ ~18% */
 }
-
 .ww-correct {
   background-color: rgba(16,185,129,0.22); /* emerald-500 @ ~22% */
 }
 
 /* ==========================================================
+   Desktop/Laptop behavior (>= 1024px): show the whole puzzle,
+   no internal clipping, leave room below for messages.
+   ========================================================== */
+@media (min-width: 1024px) {
+  .puzzle-scroller {
+    max-height: none !important;    /* remove vertical cap */
+    overflow: visible !important;   /* let the board size naturally */
+  }
+  .puzzle-touch-guard {
+    touch-action: auto;             /* desktop scroll is fine outside the board */
+  }
+}
+
+/* ==========================================================
    Mobile UI compaction (reader/library/toolbars)
-   - Shrinks common button paddings & large headings on small screens
-   - Frees vertical space for reading
+   Frees vertical space for reading on phones.
    ========================================================== */
 @media (max-width: 480px) {
-  /* Compact common “button-like” paddings (Tailwind style utilities) */
+  /* Compact common button paddings (Tailwind-like utilities) */
   .px-4.py-2 {
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
@@ -99,7 +108,7 @@ body {
     line-height: 1.1;
   }
 
-  /* Make bottom bars a tad shorter if your layout uses them */
+  /* Shorter bottom bars if you use them */
   .reader-bottombar,
   .toolbar-compact {
     padding-top: 0.375rem !important;
@@ -107,7 +116,7 @@ body {
   }
 }
 
-/* (Optional) visually hidden scrollbars, if you prefer cleaner look on some Android WebViews */
+/* Optional: hide scrollbars for a cleaner mobile look (uncomment if desired) */
 /*
 .puzzle-scroller::-webkit-scrollbar { width: 0; height: 0; }
 .puzzle-scroller { scrollbar-width: thin; scrollbar-color: transparent transparent; }

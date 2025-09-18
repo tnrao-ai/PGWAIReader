@@ -5,18 +5,6 @@ import StatsPanel from "../components/StatsPanel.jsx";
 
 /* ----------------------------------------------------
    Touch/Pan/Zoom wrapper for the puzzle
-
-   Goals:
-   - Prevent PAGE scroll/zoom while puzzle tab is active
-   - Allow TWO-AXIS SCROLL *inside* the puzzle container
-   - Keep single-finger drags for selection working
-   - Provide light zoom controls for readability
-
-   Structure:
-   [ PuzzleTouchGuard (locks body scroll, blocks outside gestures) ]
-     [ .puzzle-scroller (overflow:auto; pan in both axes; 75vh) ]
-       [ .puzzle-zoom (CSS zoom/scale) ]
-         [ WoostersWordWeb ]
 ---------------------------------------------------- */
 function PuzzleTouchGuard({ className = "", lockScroll = true, children }) {
   const ref = useRef(null);
@@ -25,37 +13,25 @@ function PuzzleTouchGuard({ className = "", lockScroll = true, children }) {
     const root = ref.current;
     if (!root) return;
 
-    // Lock body scroll while the guard is mounted (prevents page jiggle)
     const originalOverflow = document.body.style.overflow;
     if (lockScroll) document.body.style.overflow = "hidden";
 
-    // iOS specifics:
-    // - We want to allow scrolling INSIDE the puzzle scroller,
-    //   but prevent touch gestures from bubbling to the page.
     const scroller = root.querySelector(".puzzle-scroller");
 
     const onTouchMove = (e) => {
-      // If the touch originates inside the scroller, allow it (so user can pan).
-      if (scroller && scroller.contains(e.target)) {
-        // Let the browser handle the scroll normally.
-        return;
-      }
-      // Otherwise, prevent the page from moving.
-      e.preventDefault();
+      if (scroller && scroller.contains(e.target)) return; // allow panning inside scroller
+      e.preventDefault(); // block page scroll outside
     };
-
     const onTouchStart = (e) => {
-      // Same rule as move: allow touches that begin inside the scroller.
       if (scroller && scroller.contains(e.target)) return;
       e.preventDefault();
     };
 
-    // Double-tap zoom suppression outside scroller
     let lastTouchEnd = 0;
     const onTouchEnd = (e) => {
-      if (!scroller || !root.contains(e.target)) return;
+      if (!root.contains(e.target)) return;
       const now = Date.now();
-      if (now - lastTouchEnd <= 300) e.preventDefault();
+      if (now - lastTouchEnd <= 300) e.preventDefault(); // suppress dbl-tap zoom
       lastTouchEnd = now;
     };
 
@@ -72,34 +48,27 @@ function PuzzleTouchGuard({ className = "", lockScroll = true, children }) {
   }, [lockScroll]);
 
   return (
-    <div
-      ref={ref}
-      className={`puzzle-touch-guard ${className}`}
-      draggable={false}
-    >
+    <div ref={ref} className={`puzzle-touch-guard ${className}`} draggable={false}>
       {children}
     </div>
   );
 }
 
 /* ----------------------------------------------------
-   Minimal zoom controller
-   - Uses CSS zoom when available (works on WebKit/Blink),
-     and falls back to transform: scale for others.
-   - Keeps the scroller's scrollbars meaningful by
-     resizing via 'zoom' first.
+   Zoom hook (CSS zoom preferred, transform fallback)
 ---------------------------------------------------- */
 function useZoom() {
   const [level, setLevel] = useState(1); // 1 = 100%
   const supportsZoom = typeof document !== "undefined" && "zoom" in document.documentElement.style;
 
   const style = supportsZoom
-    ? { zoom: level } // affects layout size (good for scroll)
+    ? { zoom: level } // changes layout size (keeps scrollbars meaningful)
     : { transform: `scale(${level})`, transformOrigin: "top left" }; // fallback
 
-  const set = (v) => setLevel(Math.max(0.6, Math.min(2, Number(v) || 1)));
-  const inc = () => setLevel((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10));
-  const dec = () => setLevel((z) => Math.max(0.6, Math.round((z - 0.1) * 10) / 10));
+  const clamp = (v) => Math.max(0.6, Math.min(2, Number(v) || 1));
+  const set = (v) => setLevel(clamp(v));
+  const inc = () => setLevel((z) => clamp(Math.round((z + 0.1) * 10) / 10));
+  const dec = () => setLevel((z) => clamp(Math.round((z - 0.1) * 10) / 10));
   const reset = () => setLevel(1);
 
   return { level, style, set, inc, dec, reset, supportsZoom };
@@ -122,8 +91,102 @@ export default function Games() {
   const tabs = ["Wooster’s Word Web", "Jeeves’ Jottings", "Dictionary Stats", "Legal"];
   const [tab, setTab] = useState(tabs[0]);
 
-  // Zoom controller (used only by the puzzle tab)
   const zoom = useZoom();
+
+  // Refs used for auto-fit
+  const scrollerRef = useRef(null);
+  const contentRef = useRef(null);
+
+  // Auto Fit state
+  const [autoFit, setAutoFit] = useState(true);
+  const [fullyFits, setFullyFits] = useState(false); // if true, we can hide scroller overflow
+
+  // Desktop detection (match CSS breakpoint)
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.matchMedia("(min-width:1024px)").matches : false
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width:1024px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener ? mq.addEventListener("change", onChange) : mq.addListener(onChange);
+    onChange();
+    return () => {
+      mq.removeEventListener ? mq.removeEventListener("change", onChange) : mq.removeListener(onChange);
+    };
+  }, []);
+
+  // Auto-fit algorithm: measure unscaled content size and available scroller size,
+  // pick a scale so the whole board fits with a small footer reserve on mobile.
+  useEffect(() => {
+    if (tab !== "Wooster’s Word Web") return;
+
+    let ro1, ro2;
+    const handle = () => {
+      const scroller = scrollerRef.current;
+      const content = contentRef.current;
+      if (!scroller || !content) return;
+
+      // On desktop: show at 100%, no inner scroll (CSS handles overflow visible)
+      if (isDesktop) {
+        zoom.set(1);
+        setFullyFits(true);
+        return;
+      }
+
+      if (!autoFit) {
+        // When auto-fit is off, still record if it currently fits
+        const rectScaled = content.getBoundingClientRect();
+        const w = rectScaled.width / zoom.level;
+        const h = rectScaled.height / zoom.level;
+        const availW = scroller.clientWidth - 8; // a bit of padding
+        const footerReserve = 96; // px reserved for messages/score
+        const availH = scroller.clientHeight - 8 - footerReserve;
+        const target = Math.min(1, Math.min(availW / w, availH / h));
+        const fits = w * zoom.level <= availW && h * zoom.level <= (availH + footerReserve);
+        setFullyFits(fits || target >= zoom.level);
+        return;
+      }
+
+      // Measure unscaled size by dividing out current zoom
+      const rectScaled = content.getBoundingClientRect();
+      const unscaledW = rectScaled.width / zoom.level || 1;
+      const unscaledH = rectScaled.height / zoom.level || 1;
+
+      const availW = scroller.clientWidth - 8; // padding guard
+      const footerReserve = 96; // keep space below for messages/score on phones
+      const availH = scroller.clientHeight - 8 - footerReserve;
+
+      const targetScale = Math.max(0.6, Math.min(1, Math.min(availW / unscaledW, availH / unscaledH)));
+      zoom.set(targetScale);
+
+      const fitsNow = unscaledW * targetScale <= availW && unscaledH * targetScale <= (availH + footerReserve);
+      setFullyFits(fitsNow);
+    };
+
+    // Observe both scroller size and content size
+    const scroller = scrollerRef.current;
+    const content = contentRef.current;
+    if (window.ResizeObserver && scroller && content) {
+      ro1 = new ResizeObserver(handle);
+      ro2 = new ResizeObserver(handle);
+      ro1.observe(scroller);
+      ro2.observe(content);
+    }
+
+    // Also respond to window resize/orientation
+    window.addEventListener("resize", handle);
+    // Run once after mount/changes
+    setTimeout(handle, 0);
+
+    return () => {
+      window.removeEventListener("resize", handle);
+      if (ro1) ro1.disconnect();
+      if (ro2) ro2.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, autoFit, isDesktop, zoom.level]);
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
@@ -149,18 +212,34 @@ export default function Games() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg sm:text-xl font-semibold">Wooster’s Word Web</h2>
 
-            {/* Compact zoom control (shown on all screens; most helpful on phones) */}
+            {/* Controls: Auto Fit + manual zoom */}
             <div className="flex items-center gap-1">
               <button
+                className={`px-2 py-1 text-sm rounded border ${
+                  autoFit ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-gray-700"
+                }`}
+                onClick={() => setAutoFit((v) => !v)}
+                title="Auto Fit"
+                aria-pressed={autoFit}
+              >
+                Auto
+              </button>
+              <button
                 className="px-2 py-1 text-sm rounded border bg-white dark:bg-gray-700"
-                onClick={zoom.reset}
-                title="Fit (100%)"
+                onClick={() => {
+                  zoom.reset();
+                  setAutoFit(true); // reset to auto
+                }}
+                title="Fit (100% base)"
               >
                 Fit
               </button>
               <button
                 className="px-2 py-1 text-sm rounded border bg-white dark:bg-gray-700"
-                onClick={zoom.dec}
+                onClick={() => {
+                  setAutoFit(false);
+                  zoom.dec();
+                }}
                 title="Zoom out"
                 aria-label="Zoom out"
               >
@@ -168,7 +247,10 @@ export default function Games() {
               </button>
               <button
                 className="px-2 py-1 text-sm rounded border bg-white dark:bg-gray-700"
-                onClick={zoom.inc}
+                onClick={() => {
+                  setAutoFit(false);
+                  zoom.inc();
+                }}
                 title="Zoom in"
                 aria-label="Zoom in"
               >
@@ -177,34 +259,39 @@ export default function Games() {
             </div>
           </div>
 
-          {/* Guard: prevents page scrolling; scroller allows panning INSIDE */}
+          {/* Guard: blocks page scroll; scroller handles panning if needed */}
           <PuzzleTouchGuard>
             <div
+              ref={scrollerRef}
               className="puzzle-scroller rounded-lg"
               style={{
-                maxHeight: "75vh",
-                overflow: "auto",
+                // On desktop, CSS media query already makes overflow visible.
+                // On mobile, if it fully fits, hide internal scroll so drags don't fight scrollbars.
+                overflow: isDesktop ? undefined : fullyFits ? "hidden" : "auto",
+                maxHeight: isDesktop ? undefined : "85vh",
                 WebkitOverflowScrolling: "touch",
-                touchAction: "pan-x pan-y", // allow 2-axis panning inside
+                touchAction: "pan-x pan-y",
                 overscrollBehavior: "contain",
                 background: "transparent",
               }}
             >
               <div className="p-2">
-                {/* Zoom wrapper: changes layout size (via CSS zoom) or scales as fallback */}
                 <div className="puzzle-zoom" style={zoom.style}>
-                  {/* 
-                    If your component accepts className, this adds pointer-friendly hints.
-                    If not, no problem—zoom & scroller still apply.
-                  */}
-                  <WoostersWordWeb className="puzzle-pointer-surface" />
+                  {/* Content we measure for auto-fit */}
+                  <div ref={contentRef}>
+                    <WoostersWordWeb className="puzzle-pointer-surface" />
+                  </div>
                 </div>
               </div>
             </div>
           </PuzzleTouchGuard>
 
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Tip: pan inside the grid to see all letters; use +/− for size.
+            {isDesktop
+              ? "Desktop: full board shown; messages appear below."
+              : fullyFits
+              ? "Mobile: board fits; drag to select letters freely."
+              : "Mobile: pan inside the grid to see all letters; use Auto/+/− for size."}
           </p>
         </section>
       )}
